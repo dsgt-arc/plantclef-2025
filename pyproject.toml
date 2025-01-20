@@ -1,15 +1,15 @@
 [project]
-name = "my-task-project"
+    name = "plantclef"
 version = "0.1.1"
-authors = [{ name = "Anthony Miyaguchi", email = "acmiyaguchi@gatech.edu" }]
-description = "DS@GT CLEF project template"
+authors = [{ name = "Murilo Gustineli", email = "murilogustineli@gatech.edu" }]
+description = "DS@GT PlantCLEF 2025 helper package"
 readme = "README.md"
 requires-python = ">=3.8"
 dynamic = ["dependencies"]
 
 [project.urls]
-Homepage = "https://github.com/dsgt-kaggle-clef/clef-project-template"
-Issues = "https://github.com/dsgt-kaggle-clef/clef-project-template/issues"
+Homepage = "https://github.com/dsgt-kaggle-clef/plantclef-2025"
+Issues = "https://github.com/dsgt-kaggle-clef/plantclef-2025/issues"
 
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -20,5 +20,5 @@ dependencies = { file = "requirements.txt" }
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["my_task_package*"]
+include = ["plantclef*"]
 namespaces = false
