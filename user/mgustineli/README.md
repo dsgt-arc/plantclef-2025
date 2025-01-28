@@ -7,15 +7,10 @@
 To organize your work on **PACE**, create a main `~/clef` folder. This will be your working directory for cloning repositories and managing project files.
 
 ### Steps to create the `clef` directory:
-1. **Navigate to your home directory:**
-    ```
-    cd ~
-    ```
+1. **Navigate to your home directory:** `cd ~`
+    
     The output should look like: `/storage/home/hcoda1/9/user-name`
-2. **Create the `clef` directory:**
-    ```
-    mkdir clef
-    ```
+2. **Create the `clef` directory:** `mkdir clef`
 3. **Navigate to the `clef` directory and clone your repository:** For example, to clone the `plantclef-2025` repository:
     ```
     cd clef
@@ -64,6 +59,45 @@ To keep dependencies isolated, create a virtual environment in your `~/scratch` 
 6. Install dependencies: `pip install -r requirements.txt`
 7. Verify the installation: `pip list`
 8. Run the package tests using the `pytest` command: `pytest -v tests/`
-9. Add the pre-commit hooks to your repository to ensure that the code is formatted correctly and that the tests pass before committing: `pre-commit install`
+9. Add the **pre-commit hooks** to your repo. This ensures that the code is formatted correctly and that the tests pass before committing: `pre-commit install`
 
 Your environment is now set up and ready for development.
+
+
+<!--1. **Navigate to the scratch directory:** 
+    ```
+    cd ~/scratch
+    ```
+2. **Create the Virtual Environment:**
+    ```
+    python -m venv .venv
+    ```
+3. **Activate the Virtual Environment:** 
+    ```
+    source .venv/bin/activate
+    ```
+4. **Navigate to your repo:** 
+    ```
+    cd ~/clef/plantclef-2025
+    ```
+5. **Intall the package in editable mode:**
+    ```
+    pip install -e .
+    ```
+6. **Install dependencies:** 
+    ```
+    pip install -r requirements.txt
+    ```
+7. **Verify the installation:**
+    ```
+    pip list
+    ```
+8. **Run the package tests using the `pytest` command:** 
+    ```
+    pytest -v tests/
+    ```
+9. **Add the pre-commit hooks to your repo:** This ensures that the code is formatted correctly and that the tests pass before committing. 
+    ```
+    pre-commit install
+    ``` -->
+
