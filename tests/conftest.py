@@ -1,5 +1,5 @@
 import pytest
-from my_task_package.spark import spark_resource
+from plantclef.spark import spark_resource
 
 
 @pytest.fixture(scope="session")

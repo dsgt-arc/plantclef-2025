@@ -60,7 +60,10 @@ To keep dependencies isolated, create a virtual environment in your `~/scratch` 
 2. Create the Virtual Environment: `python -m venv .venv`
 3. Activate the Virtual Environment: `source .venv/bin/activate`
 4. Navigate to your repo: `cd ~/clef/plantclef-2025`
-5. Install dependencies: `pip install -r requirements.txt`
-6. Verify the installation: `pip list`
+5. Intall the package in editable mode: `pip install -e .`
+6. Install dependencies: `pip install -r requirements.txt`
+7. Verify the installation: `pip list`
+8. Run the package tests using the `pytest` command: `pytest -v tests/`
+9. Add the pre-commit hooks to your repository to ensure that the code is formatted correctly and that the tests pass before committing: `pre-commit install`
 
 Your environment is now set up and ready for development.
