@@ -4,7 +4,7 @@
 > Use it to test out new ideas or to fork code/notebooks from other people and to share the results with them.
 
 ## 1. Project Setup
-To organize your work, create a main `clef` folder. This will be your working directory for cloning repositories and managing project files.
+To organize your work on **PACE**, create a main `~/clef` folder. This will be your working directory for cloning repositories and managing project files.
 
 ### Steps to create the `clef` directory:
 1. **Navigate to your home directory:**
@@ -37,13 +37,13 @@ To authenticate with GitHub via SSH, follow these steps to add your SSH key:
     ```
     This should be the email in your GitHub account.
 2. Copy the output, which starts with `ssh-rsa` followed by a long string of characters.
-3. Log in to GitHub. In the upper-right corner of your page on GitHub, click your profile photo, then click **Settings**.
+3. Log in to [**GitHub**](https://github.com/). In the upper-right corner of your GitHub page, click your profile photo, then click **Settings**.
 4. In the "Access" section of the sidebar, click **SSH and GPG keys**.
 5. Click **New SSH key**. 
-6. Give a key title, like `pace-ssh-key`
-7. In the "Key" field and paste your public key.
+6. Give a key title, like `pace-ssh-key`.
+7. In the "Key" field, paste your public key.
 8. Click on **Add SSH Key**
-9. Set Git user information by running the commands:
+9. Back on VS Code, set Git user information by running the commands:
     ```
     git config --global user.email "you@example.com"
     git config --global user.name "Your Name"
@@ -56,24 +56,11 @@ If you're having issues, refer to the GitHub documentation [**Adding a new SSH k
 ## 3. Setting Up a Virtual Environment
 To keep dependencies isolated, create a virtual environment in your `~/scratch` directory and install the required packages.
 
-```
-# 1. Navigate to the scratch directory
-cd ~/scratch
-
-# 2. Create the Virtual Environment
-python -m venv .venv
-
-# 3. Activate the Virtual Environment
-source .venv/bin/activate
-
-# 4. Navigate to your repo
-cd ~/clef/plantclef-2025
-
-# 5. Install dependencies
-pip install -r requirements.txt
-
-# 6. Verify the installation
-pip list
-```
+1. Navigate to the scratch directory: `cd ~/scratch`
+2. Create the Virtual Environment: `python -m venv .venv`
+3. Activate the Virtual Environment: `source .venv/bin/activate`
+4. Navigate to your repo: `cd ~/clef/plantclef-2025`
+5. Install dependencies: `pip install -r requirements.txt`
+6. Verify the installation: `pip list`
 
 Your environment is now set up and ready for development.
