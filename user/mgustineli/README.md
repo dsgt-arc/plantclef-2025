@@ -3,58 +3,77 @@
 > This is a scratch directory where you can commit files to without worrying about polluting the main repository.
 > Use it to test out new ideas or to fork code/notebooks from other people and to share the results with them.
 
-## Project Setup
-### Directories & Repo
-We will create a main `clef` folder where we will be working from. This is the place where we will clone the repos and work from.
+## 1. Project Setup
+To organize your work, create a main `clef` folder. This will be your working directory for cloning repositories and managing project files.
 
-To create the `clef` directory, make sure you are in your home directory. Run the commands `cd ~` followed by `pwd`.You should get something like `/storage/home/hcoda1/9/user-name`.
+### Steps to create the `clef` directory:
+1. **Navigate to your home directory:**
+    ```
+    cd ~
+    ```
+    The output should look like: `/storage/home/hcoda1/9/user-name`
+2. **Create the `clef` directory:**
+    ```
+    mkdir clef
+    ```
+3. **Navigate to the `clef` directory and clone your repository:** For example, to clone the `plantclef-2025` repository:
+    ```
+    cd clef
+    git clone git@github.com:dsgt-kaggle-clef/plantclef-2025.git
+    ```
 
-Create the `clef` directory by running: `mkdir clef`.
+**Note:** If you encounter an error during cloning, ensure your SSH key is added to your GitHub account (see the next section).
 
-Navigate to the `clef` directory and clone your repo. I'll be cloning the `plantclef-2025` repo as an example:
+## 2. Authenticating to GitHub
+To authenticate with GitHub via SSH, follow these steps to add your SSH key:
+
+1. Display your public SSH key: 
+    ```
+    cat ~/.ssh/id_rsa.pub
+    ```
+    If the file doesn’t exist, generate an SSH key using:
+    ```
+    ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+    ```
+    This should be the email in your GitHub account.
+2. Copy the output, which starts with `ssh-rsa` followed by a long string of characters.
+3. Log in to GitHub. In the upper-right corner of your page on GitHub, click your profile photo, then click **Settings**.
+4. In the "Access" section of the sidebar, click **SSH and GPG keys**.
+5. Click **New SSH key**. 
+6. Give a key title, like `pace-ssh-key`
+7. In the "Key" field and paste your public key.
+8. Click on **Add SSH Key**
+9. Set Git user information by running the commands:
+    ```
+    git config --global user.email "you@example.com"
+    git config --global user.name "Your Name"
+    ```
+    Replace with your GitHub email and name.
+
+If you're having issues, refer to the GitHub documentation [**Adding a new SSH key to your GitHub account**](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
+
+
+## 3. Setting Up a Virtual Environment
+To keep dependencies isolated, create a virtual environment in your `~/scratch` directory and install the required packages.
+
 ```
-cd clef
-git clone git@github.com:dsgt-kaggle-clef/plantclef-2025.git
-```
-
-If you get an error when cloning the repo, it's likely because you don't have the `id_rsa.pub` in your GitHub account.
-
-Follow the next steps to add a new SSH key to your GitHub account:
-1. Run the command: `cat ~/.ssh/id_rsa.pub`
-2. Copy the output. It should be a string starting with `ssh-rsa` followed by a long string of letter and numbers, like `ssh-rsa ABCDE123...`
-3. Go to your GitHub account. Click on your profile on the top right corner. Select `Settings` and `SSH and GPG keys`
-4. Click on `New SSH key`. Give a key title, like `pace-ssh-key`, and paste the output from the previous step in the Key box. Click on `Add SSH Key`.
-
-### Virtual Environment
-We will set up a virtual environment in your `scratch` directory and install the packages from your `pyproject.toml` file that's in the repo. Follow these steps:
-
-**1. Navigate to the Scratch Directory:** Move into the directory where you want to create the virtual environment:
-```
+# 1. Navigate to the scratch directory
 cd ~/scratch
-```
 
-**2. Create the Virtual Environment:** Create a virtual environment in the `scratch` directory:
-```
-python3 -m venv .venv
-```
-This will create a virtual environment named `.venv` in `~/scratch`.
+# 2. Create the Virtual Environment
+python -m venv .venv
 
-**3. Activate the Virtual Environment:** Activate the virtual environment:
-```
-source ~/scratch/.venv/bin/activate
-```
+# 3. Activate the Virtual Environment
+source .venv/bin/activate
 
-**4. Navigate to Your Repository:** Move into the plantclef-2025 directory:
-```
+# 4. Navigate to your repo
 cd ~/clef/plantclef-2025
-```
 
-Install Dependencies: Use pip to install the packages listed in your pyproject.toml:
-
+# 5. Install dependencies
 pip install -r requirements.txt
 
-If you're using Poetry or another tool that works with pyproject.toml, install the dependencies using the appropriate command (e.g., poetry install).
-
-Verify Installation: Check that the packages were installed correctly:
-
+# 6. Verify the installation
 pip list
+```
+
+Your environment is now set up and ready for development.
