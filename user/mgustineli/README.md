@@ -19,16 +19,36 @@ To organize your work on **PACE**, create a main `~/clef` folder. This will be y
 
 **Note:** If you encounter an error during cloning, ensure your SSH key is added to your GitHub account (see the next section).
 
-## 2. Authenticating to GitHub via GitHub CLI
-We will download and install the GitHub CLI (`gh`) directly using `curl` and add it to PATH, follow these steps:
+## 2. Setting Up a Virtual Environment
+To keep dependencies isolated, create a virtual environment in your `~/scratch` directory and install the required packages.
+
+1. Navigate to the scratch directory: `cd ~/scratch`
+2. Create the Virtual Environment: `python -m venv .venv`
+3. Activate the Virtual Environment: `source .venv/bin/activate`
+4. Navigate to your repo: `cd ~/clef/plantclef-2025`
+5. Intall the package in editable mode: `pip install -e .`
+6. Install dependencies: `pip install -r requirements.txt`
+7. Verify the installation: `pip list`
+8. Run the package tests using the `pytest` command: `pytest -v tests/`
+9. Add the **pre-commit hooks** to your repo. This ensures that the code is formatted correctly and that the tests pass before committing: `pre-commit install`
+
+Your environment is now set up and ready for development.
+
+## 3. Downloading the GitHub CLI `gh`
+To authenticate to GitHub, first we will download and install the GitHub CLI (`gh`) 
+directly using `curl` and add it to PATH, follow these steps:
 
 1. Create a `bin` directory in your home folder:
     ```
     mkdir -p ~/bin
     ```
+2. Get exact download URL via GitHub API:
+    ```
+    LATEST_URL=$(curl -s https://api.github.com/repos/cli/cli/releases/latest | grep "browser_download_url.*linux_amd64.tar.gz" | cut -d '"' -f 4)
+    ```
 2. Download the `gh` binary file into the `~/bin` directory using curl:
     ```
-    curl -L "https://github.com/cli/cli/releases/latest/download/gh_$(uname -s)_$(uname -m).tar.gz" -o ~/bin/gh.tar.gz
+    curl -L "$LATEST_URL" -o ~/bin/gh.tar.gz
     ```
 3. Extract the file using `tar`:
     ```
@@ -51,50 +71,97 @@ Now you should be albe to run `gh` from any directory. To verify the installatio
 gh --version
 ```
 
+## 4. Authenticating to GitHub using GitHub CLI
+This section streamlines the authentication process to GitHub using the 
+GitHub CLI (`gh`), which simplifies the SSH setup. 
 
-<!-- ## 2. Authenticating to GitHub
-To authenticate with GitHub via SSH, follow these steps to add your SSH key:
+### Step 1: Authenticate to GitHub using GitHub CLI
+**Run in PACE (VS Code terminal)**
 
-1. Display your public SSH key: 
+1. **Start the Authentication Process:** Run `gh auth login` to begin the authentication process.
+2. **Choose SSH for Git Operations:** When prompted, select **SSH** as the preferred protocol for Git operations.
+3. **Generate a New SSH Key (if required):** If you don't already have an SSH key, `gh` will prompt you to generate one. Follow the on-screen instructions to create a new SSH key.
+4. **Authenticate Your SSH Key with GitHub:** `gh` will automatically add your SSH key to your GitHub account. Follow any additional prompts to complete the process.
+5. **Verify Authentication:** After completing the setup, run `gh auth status` to check if you're successfully authenticated.
+
+### Step 2: Verify GitHub User Information (Optional)
+
+**Run in PACE (VS Code terminal)**
+
+It's good practice to ensure your Git identity is correctly set:
+1. **Check Git Configurations:** Run `git config --list` to see your Git configurations, including user name and email.
+2. **Set Git User Information If Not Set:** If not already set, configure your Git user information:
+```
+git config --global user.email "you@example.com"
+git config --global user.name "Your Name"
+```
+Replace with your GitHub email and name.
+
+
+## 5. Cloning the Repository and Branching for Development
+This final step in the onboarding process involves cloning the desired GitHub repository to your VM and creating a new branch for development. In this example, we'll use the `birdclef-2024` repository.
+
+### Step 1: Clone the Repository
+1. **Navigate to Desired Directory:** Choose the directory where you want to clone the repository. For instance, `cd ~/projects`.
+2. **Clone the Repository:** Run the following command to clone the `plantclef-2025` repository:
     ```
-    cat ~/.ssh/id_rsa.pub
+    git clone https://github.com/dsgt-kaggle-clef/birdclef-2024.git
     ```
-    If the file doesn’t exist, generate an SSH key using:
+3. **Navigate into the Repository Directory:** After cloning, move into the repository's directory:
     ```
-    ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+    cd plantclef-2025
     ```
-    This should be the email in your GitHub account.
-2. Copy the output, which starts with `ssh-rsa` followed by a long string of characters.
-3. Log in to [**GitHub**](https://github.com/). In the upper-right corner of your GitHub page, click your profile photo, then click **Settings**.
-4. In the "Access" section of the sidebar, click **SSH and GPG keys**.
-5. Click **New SSH key**. 
-6. Give a key title, like `pace-ssh-key`.
-7. In the "Key" field, paste your public key.
-8. Click on **Add SSH Key**
-9. Back on VS Code, set Git user information by running the commands:
-    ```
-    git config --global user.email "you@example.com"
-    git config --global user.name "Your Name"
-    ```
-    Replace with your GitHub email and name.
 
-If you're having issues, refer to the GitHub documentation [**Adding a new SSH key to your GitHub account**](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account). -->
+### Step 2: Create and Checkout a New Branch
+Creating a new branch ensures that your development work is separated from the main branch, allowing for easier code management and review.
+
+1. **Fetch All Branches (Optional):** If you want to see all existing branches first, run `git fetch --all`.
+2. **Create a New Branch:** Create a new branch off the main branch for your development work:
+    ```
+    git checkout -b feature/your-branch-name
+    ```
+    Replace `your-branch-name` with a meaningful name for your development work, typically starting with `feature/`, `bugfix/`, or similar prefixes.
+3. **Verify New Branch:** Ensure you're on the new branch with `git branch`. The new branch should be highlighted.
 
 
-## 3. Setting Up a Virtual Environment
-To keep dependencies isolated, create a virtual environment in your `~/scratch` directory and install the required packages.
+### Step 3: Verify the Setup
+1. **Check Repository Content:** Verify that the repository content is correctly cloned by listing the files with `ls`.
+2. **Check Branch Status:** Use `git status` to ensure you're on the correct branch and to see if there are any changes.
 
-1. Navigate to the scratch directory: `cd ~/scratch`
-2. Create the Virtual Environment: `python -m venv .venv`
-3. Activate the Virtual Environment: `source .venv/bin/activate`
-4. Navigate to your repo: `cd ~/clef/plantclef-2025`
-5. Intall the package in editable mode: `pip install -e .`
-6. Install dependencies: `pip install -r requirements.txt`
-7. Verify the installation: `pip list`
-8. Run the package tests using the `pytest` command: `pytest -v tests/`
-9. Add the **pre-commit hooks** to your repo. This ensures that the code is formatted correctly and that the tests pass before committing: `pre-commit install`
 
-Your environment is now set up and ready for development.
+### Step 4: Naming Convention for Jupyter Notebooks
+When creating new Jupyter notebooks, adhere to the following naming convention:
+
+- **Format:** `initials-date-version-title.ipynb`
+- **Explanation:**
+    - **initials:** Your initials (e.g., Tony Stark → ts).
+    - **date:** The date you created the notebook in YYYYMMDD format.
+    - **version:** A two-digit version number, starting from `00`.
+    - **title:** A brief, hyphen-separated title describing the notebook's purpose.
+
+**Example**
+
+If Tony Stark creates a data analysis notebook on January 18, 2024, the filename would be:
+- `ts-20240118-00-data-analysis.ipynb`
+
+### Step 5: Regularly Commit Changes
+
+Remember to regularly commit your changes to maintain a record of your work and to synchronize with the remote repository.
+
+1. **Stage Changes:** Use `git add .` to stage all changes in the 'notebooks' directory.
+2. **Commit Changes:** Commit with a descriptive message:
+    ```
+    git commit -m "Add initial data analysis notebook by TS"
+    ```
+3. **Push to Remote:** Push your changes to the remote repository:
+    ```
+    git push -u origin feature/your-branch-name
+    ```
+
+That's it! You're now all set to start developing on your project. Happy coding! 😊💻
+
+
+
 
 
 <!--1. **Navigate to the scratch directory:** 
