@@ -19,7 +19,40 @@ To organize your work on **PACE**, create a main `~/clef` folder. This will be y
 
 **Note:** If you encounter an error during cloning, ensure your SSH key is added to your GitHub account (see the next section).
 
-## 2. Authenticating to GitHub
+## 2. Authenticating to GitHub via GitHub CLI
+We will download and install the GitHub CLI (`gh`) directly using `curl` and add it to PATH, follow these steps:
+
+1. Create a `bin` directory in your home folder:
+    ```
+    mkdir -p ~/bin
+    ```
+2. Download the `gh` binary file into the `~/bin` directory using curl:
+    ```
+    curl -L "https://github.com/cli/cli/releases/latest/download/gh_$(uname -s)_$(uname -m).tar.gz" -o ~/bin/gh.tar.gz
+    ```
+3. Extract the file using `tar`:
+    ```
+    tar -xzf ~/bin/gh.tar.gz -C ~/bin --strip-components=2 gh_*/bin/gh
+    ```
+4. Remove the downloaded `tar.gz` file:
+    ```
+    rm ~/bin/gh.tar.gz
+    ```
+5. Add the `~/bin` directory to your PATH by editing your shell configuration file. Add the following line at the end of the file:
+    ```
+    export PATH="$HOME/bin:$PATH"
+    ```
+6. Apply the changes to your current session:
+    ```
+    source ~/.bashrc
+    ```
+Now you should be albe to run `gh` from any directory. To verify the installation, run: 
+```
+gh --version
+```
+
+
+<!-- ## 2. Authenticating to GitHub
 To authenticate with GitHub via SSH, follow these steps to add your SSH key:
 
 1. Display your public SSH key: 
@@ -45,7 +78,7 @@ To authenticate with GitHub via SSH, follow these steps to add your SSH key:
     ```
     Replace with your GitHub email and name.
 
-If you're having issues, refer to the GitHub documentation [**Adding a new SSH key to your GitHub account**](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
+If you're having issues, refer to the GitHub documentation [**Adding a new SSH key to your GitHub account**](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account). -->
 
 
 ## 3. Setting Up a Virtual Environment
