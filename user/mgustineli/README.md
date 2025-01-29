@@ -8,7 +8,7 @@ To organize your work on **PACE**, create a main `~/clef` folder. This will be y
 
 ### Steps to create the `clef` directory:
 1. **Navigate to your home directory:** `cd ~`
-    
+
     The output should look like: `/storage/home/hcoda1/9/user-name`
 2. **Create the `clef` directory:** `mkdir clef`
 3. **Navigate to the `clef` directory and clone your repository:** For example, to clone the `plantclef-2025` repository:
@@ -19,22 +19,8 @@ To organize your work on **PACE**, create a main `~/clef` folder. This will be y
 
 **Note:** If you encounter an error during cloning, ensure your SSH key is added to your GitHub account (see the next section).
 
-## 2. Setting Up a Virtual Environment
-To keep dependencies isolated, create a virtual environment in your `~/scratch` directory and install the required packages.
 
-1. Navigate to the scratch directory: `cd ~/scratch`
-2. Create the Virtual Environment: `python -m venv .venv`
-3. Activate the Virtual Environment: `source .venv/bin/activate`
-4. Navigate to your repo: `cd ~/clef/plantclef-2025`
-5. Intall the package in editable mode: `pip install -e .`
-6. Install dependencies: `pip install -r requirements.txt`
-7. Verify the installation: `pip list`
-8. Run the package tests using the `pytest` command: `pytest -v tests/`
-9. Add the **pre-commit hooks** to your repo. This ensures that the code is formatted correctly and that the tests pass before committing: `pre-commit install`
-
-Your environment is now set up and ready for development.
-
-## 3. Downloading the GitHub CLI `gh`
+## 2. Downloading the GitHub CLI `gh`
 To authenticate to GitHub, first we will download and install the GitHub CLI (`gh`) 
 directly using `curl` and add it to PATH, follow these steps:
 
@@ -71,7 +57,7 @@ Now you should be albe to run `gh` from any directory. To verify the installatio
 gh --version
 ```
 
-## 4. Authenticating to GitHub using GitHub CLI
+## 3. Authenticating to GitHub using GitHub CLI
 This section streamlines the authentication process to GitHub using the 
 GitHub CLI (`gh`), which simplifies the SSH setup. 
 
@@ -98,14 +84,14 @@ git config --global user.name "Your Name"
 Replace with your GitHub email and name.
 
 
-## 5. Cloning the Repository and Branching for Development
-This final step in the onboarding process involves cloning the desired GitHub repository to your VM and creating a new branch for development. In this example, we'll use the `birdclef-2024` repository.
+## 4. Cloning the Repository and Branching for Development
+This final step in the onboarding process involves cloning the desired GitHub repository to your VM and creating a new branch for development. In this example, we'll use the [**`plantclef-2025`**](https://github.com/dsgt-kaggle-clef/plantclef-2025/tree/main) repository.
 
 ### Step 1: Clone the Repository
-1. **Navigate to Desired Directory:** Choose the directory where you want to clone the repository. For instance, `cd ~/projects`.
+1. **Navigate to Desired Directory:** Choose the directory where you want to clone the repository. For instance, `cd ~/clef`.
 2. **Clone the Repository:** Run the following command to clone the `plantclef-2025` repository:
     ```
-    git clone https://github.com/dsgt-kaggle-clef/birdclef-2024.git
+    git clone git@github.com:dsgt-kaggle-clef/plantclef-2025.git
     ```
 3. **Navigate into the Repository Directory:** After cloning, move into the repository's directory:
     ```
@@ -118,9 +104,9 @@ Creating a new branch ensures that your development work is separated from the m
 1. **Fetch All Branches (Optional):** If you want to see all existing branches first, run `git fetch --all`.
 2. **Create a New Branch:** Create a new branch off the main branch for your development work:
     ```
-    git checkout -b feature/your-branch-name
+    git checkout -b username/your-branch-name
     ```
-    Replace `your-branch-name` with a meaningful name for your development work, typically starting with `feature/`, `bugfix/`, or similar prefixes.
+    Replace `your-branch-name` with a meaningful name for your development work, typically like `username/data-analysis`, or similar prefixes.
 3. **Verify New Branch:** Ensure you're on the new branch with `git branch`. The new branch should be highlighted.
 
 
@@ -140,13 +126,13 @@ When creating new Jupyter notebooks, adhere to the following naming convention:
     - **title:** A brief, hyphen-separated title describing the notebook's purpose.
 
 **Example**
-
-If Tony Stark creates a data analysis notebook on January 18, 2024, the filename would be:
-- `ts-20240118-00-data-analysis.ipynb`
+If Tony Stark creates a data analysis notebook on January 18, 2025, 
+the filename would be:
+- `ts-20250118-00-data-analysis.ipynb`
 
 ### Step 5: Regularly Commit Changes
-
-Remember to regularly commit your changes to maintain a record of your work and to synchronize with the remote repository.
+Remember to regularly commit your changes to maintain a record of 
+your work and to synchronize with the remote repository.
 
 1. **Stage Changes:** Use `git add .` to stage all changes in the 'notebooks' directory.
 2. **Commit Changes:** Commit with a descriptive message:
@@ -155,8 +141,28 @@ Remember to regularly commit your changes to maintain a record of your work and 
     ```
 3. **Push to Remote:** Push your changes to the remote repository:
     ```
-    git push -u origin feature/your-branch-name
+    git push -u origin username/your-branch-name
     ```
+
+
+## 5. Setting Up a Virtual Environment
+To keep dependencies isolated, we will create a virtual environment in your `~/scratch` directory and install the required packages.
+
+### Prerequisite: Make sure you have done the TODOs in the [**`clef-project-template`**](https://github.com/dsgt-kaggle-clef/plantclef-2025/tree/main) repo!
+
+After finishing the TODOs from the `clef-project-template`, do the following: 
+1. Navigate to the scratch directory: `cd ~/scratch`
+2. Create the Virtual Environment: `python -m venv .venv`
+3. Activate the Virtual Environment: `source .venv/bin/activate`
+4. Navigate to your repo: `cd ~/clef/plantclef-2025`
+5. Intall the package in editable mode: `pip install -e .`
+6. Install dependencies: `pip install -r requirements.txt`
+7. Verify the installation: `pip list`
+8. Run the package tests using the `pytest` command: `pytest -v tests/`
+9. Add the **pre-commit hooks** to your repo. This ensures that the code is formatted correctly and that the tests pass before committing: `pre-commit install`
+
+Your environment is now set up and ready for development.
+
 
 That's it! You're now all set to start developing on your project. Happy coding! 😊💻
 
