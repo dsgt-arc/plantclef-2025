@@ -67,7 +67,7 @@ def parse_args():
     parser.add_argument(
         "--memory",
         type=str,
-        default="8g",
+        default="16g",
         help="Amount of memory to use in Spark driver",
     )
     parser.add_argument(
