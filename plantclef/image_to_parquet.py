@@ -1,3 +1,4 @@
+import os
 import argparse
 from pathlib import Path
 
@@ -11,58 +12,73 @@ Use the bash file `download_extract_dataset.sh` in the scripts folder.
 """
 
 
-def create_dataframe(spark, base_dir: Path, raw_root_path: str, meta_dataset_name: str):
+def get_home_dir():
+    """Get the home directory for the current user on PACE."""
+    return Path(os.path.expanduser("~"))
+
+
+def create_spark_dataframe(
+    spark, image_base_path: Path, metadata_path: str, metadata_filename: str
+):
     """Converts images into binary data and joins with a Metadata DataFrame"""
     # Load all files from the base directory as binary data
     image_df = (
         spark.read.format("binaryFile")
         .option("pathGlobFilter", "*.jpg")
         .option("recursiveFileLookup", "true")
-        .load(base_dir.as_posix())
+        .load(image_base_path.as_posix())
     )
 
     # Construct the string to be replaced - adjust this based on your actual base path
-    to_remove = "file:" + str(base_dir.parents[0])
+    base_path_to_remove = "file:" + str(image_base_path.parents[0])
 
-    # Remove "file:{base_dir.parents[0]" from path column
-    image_df = image_df.withColumn("path", F.regexp_replace("path", to_remove, ""))
+    # Remove "file:{image_base_path.parents[0]" from path column
+    image_df = image_df.withColumn(
+        "path", F.regexp_replace("path", base_path_to_remove, "")
+    )
 
     # Split the path into an array of elements
     split_path = F.split(image_df["path"], "/")
 
     # Select and rename columns to fit the target schema, including renaming 'content' to 'data'
-    image_final_df = image_df.select(
+    image_df = image_df.select(
         "path",
         F.element_at(split_path, -1).alias("image_name"),
         F.col("content").alias("data"),
     )
 
     # Read the iNaturalist metadata CSV file
-    meta_df = spark.read.csv(
-        f"{raw_root_path}/{meta_dataset_name}.csv",
+    metadata_df = spark.read.csv(
+        f"{metadata_path}/{metadata_filename}.csv",
         header=True,
         inferSchema=True,
         sep=";",  # specify semicolon as delimiter
     )
 
     # Drop duplicate entries based on 'image_path' before the join
-    meta_final_df = meta_df.dropDuplicates(["image_name"])
+    metadata_df = metadata_df.dropDuplicates(["image_name"])
 
     # Perform an inner join on the 'image_path' column
-    final_df = image_final_df.join(meta_final_df, "image_name", "inner").repartition(
+    combined_df = image_df.join(metadata_df, "image_name", "inner").repartition(
         500, "species_id"
     )
 
-    return final_df
+    return combined_df
 
 
 def parse_args():
-    """Parse command line arguments."""
+    """Parse command-line arguments."""
+    home_dir = get_home_dir()
+    dataset_base_path = f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/data"
+
     parser = argparse.ArgumentParser(
         description="Process images and metadata for a dataset stored on GCS."
     )
     parser.add_argument(
-        "--cores", type=int, default=4, help="Number of cores used in Spark driver"
+        "--cores",
+        type=int,
+        default=os.cpu_count(),
+        help="Number of cores used in Spark driver",
     )
     parser.add_argument(
         "--memory",
@@ -73,19 +89,19 @@ def parse_args():
     parser.add_argument(
         "--image-root-path",
         type=str,
-        default=str(Path(".").resolve()),
+        default=f"{dataset_base_path}/train/PlantCLEF2024/test/1355868",
         help="Base directory path for image data",
     )
     parser.add_argument(
-        "--raw-root-path",
+        "--metadata-path",
         type=str,
-        default="gs://dsgt-clef-plantclef-2024/raw/",
+        default=f"{dataset_base_path}/metadata",
         help="Root directory path for metadata",
     )
     parser.add_argument(
         "--output-path",
         type=str,
-        default="gs://dsgt-clef-plantclef-2024/data/parquet_files/PlantCLEF2024_training",
+        default=f"{dataset_base_path}/parquet_files/PlantCLEF2024_training",
         help="GCS path for output Parquet files",
     )
     parser.add_argument(
@@ -95,10 +111,10 @@ def parse_args():
         help="Dataset name downloaded from tar file",
     )
     parser.add_argument(
-        "--meta-dataset-name",
+        "--metadata-filename",
         type=str,
         default="PlantCLEF2024singleplanttrainingdata",
-        help="Train Metadata CSV file",
+        help="Train Metadata CSV filename (without extension)",
     )
 
     return parser.parse_args()
@@ -113,15 +129,15 @@ def main():
         cores=args.cores, memory=args.memory, **{"spark.sql.shuffle.partitions": 500}
     )
 
-    # Convert raw-root-path to a Path object here
-    base_dir = Path(args.image_root_path) / "data" / args.dataset_name
+    # Convert root-path to a Path object here
+    image_base_path = Path(args.image_root_path)
 
     # Create image dataframe
-    final_df = create_dataframe(
+    final_df = create_spark_dataframe(
         spark=spark,
-        base_dir=base_dir,
-        raw_root_path=args.raw_root_path,
-        meta_dataset_name=args.meta_dataset_name,
+        image_base_path=image_base_path,
+        metadata_path=args.metadata_path,
+        metadata_filename=args.metadata_filename,
     )
 
     # Write the DataFrame to GCS in Parquet format
