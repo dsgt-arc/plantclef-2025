@@ -101,14 +101,8 @@ def parse_args():
     parser.add_argument(
         "--output-path",
         type=str,
-        default=f"{dataset_base_path}/parquet_files/PlantCLEF2024_training",
-        help="GCS path for output Parquet files",
-    )
-    parser.add_argument(
-        "--dataset-name",
-        type=str,
-        default="PlantCLEF2024",
-        help="Dataset name downloaded from tar file",
+        default=f"{dataset_base_path}/parquet_files/train",
+        help="Path for output Parquet files",
     )
     parser.add_argument(
         "--metadata-filename",
