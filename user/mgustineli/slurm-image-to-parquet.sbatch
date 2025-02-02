@@ -10,7 +10,7 @@
 #SBATCH -oReport-%j.out                         # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
-set -xeu
+set -xe
 
 # Print job info
 echo "Job ID: $SLURM_JOB_ID"
@@ -18,19 +18,20 @@ echo "Hostname: $(hostname)"
 echo "Number of CPUs: $(nproc)"
 echo "Available memory: $(free -h)"
 
-# Directory setup
-SCRATCH_DIR=~/scratch/plantclef
-mkdir -p $SCRATCH_DIR
-cd $SCRATCH_DIR
+# Uncomment the following lines if you're running this script for the first time
+# # Directory setup
+# SCRATCH_DIR=~/scratch/plantclef
+# mkdir -p $SCRATCH_DIR
+# cd $SCRATCH_DIR
+# # Python environment setup
+# python3 -m venv venv                          # Create virtual environment
+# source venv/bin/activate                      # Activate the environment
+# pip install --upgrade pip                     # Upgrade pip
+# pip install -e ~/clef/plantclef-2025          # Installs package
 
-# Python environment setup
-python3 -m venv venv                        # Create virtual environment
-source venv/bin/activate                    # Activate the environment
-pip install --upgrade pip                   # Upgrade pip
-pip install -e ~/clef/plantclef-2025        # Installs package
-
-# Set the PYTHONPATH to include your project directory
-export PYTHONPATH=$PYTHONPATH:~/clef/plantclef-2025
+# Load and activate Python module
+module load python/3.12.5                       # Load Python module
+source ~/scratch/plantclef/venv/bin/activate    # Activate the environment
 
 # Run Python script
 python ~/clef/plantclef-2025/plantclef/image_to_parquet.py
