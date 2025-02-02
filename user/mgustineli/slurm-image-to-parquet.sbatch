@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=1                     # Number of parallel tasks per node
 #SBATCH --cpus-per-task=4                       # Number of CPU cores per task
 #SBATCH --mem-per-cpu=16G                       # Total memory per core for the job
-#SBATCH --time=1:00:00                          # Duration of the job (1 hour)
+#SBATCH --time=8:00:00                          # Duration of the job (8 hours)
 #SBATCH --qos=inferno                           # QOS Name (inferno or embers)
 #SBATCH -oReport-%j.out                         # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences

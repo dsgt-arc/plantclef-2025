@@ -89,7 +89,7 @@ def parse_args():
     parser.add_argument(
         "--image-root-path",
         type=str,
-        default=f"{dataset_base_path}/train/PlantCLEF2024/test/1355868",
+        default=f"{dataset_base_path}/train/PlantCLEF2024",
         help="Base directory path for image data",
     )
     parser.add_argument(
