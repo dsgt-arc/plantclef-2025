@@ -3,6 +3,7 @@ Before running this script, make sure you have downloaded and extracted the test
 Use the bash file `download_extract_dataset.sh` in the scripts folder.
 """
 
+import os
 import argparse
 from pathlib import Path
 
@@ -11,29 +12,36 @@ from pyspark.sql import functions as F
 from plantclef.spark import get_spark
 
 
-def create_test_dataframe(spark, base_dir: Path):
+def get_home_dir():
+    """Get the home directory for the current user on PACE."""
+    return Path(os.path.expanduser("~"))
+
+
+def create_spark_test_dataframe(spark, image_base_path: Path):
     # Load all files from the base directory as binary data
     # Convert Path object to string when passing to PySpark
     image_df = (
         spark.read.format("binaryFile")
         .option("pathGlobFilter", "*.jpg")
         .option("recursiveFileLookup", "true")
-        .load(base_dir.as_posix())
+        .load(image_base_path.as_posix())
     )
 
     # Construct the string to be replaced - adjust this based on your actual base path
-    to_remove = "file:" + str(base_dir.parents[0])
+    base_path_to_remove = "file:" + str(image_base_path.parents[0])
 
-    # Remove "file:{base_dir.parents[0]" from path column
-    image_df = image_df.withColumn("path", F.regexp_replace("path", to_remove, ""))
+    # Remove "file:{image_base_path.parents[0]" from path column
+    image_df = image_df.withColumn(
+        "path", F.regexp_replace("path", base_path_to_remove, "")
+    )
 
     # Split the path into an array of elements
     split_path = F.split(image_df["path"], "/")
 
     # Select and rename columns to fit the target schema, including renaming 'content' to 'data'
     image_final_df = image_df.select(
-        "path",
         F.element_at(split_path, -1).alias("image_name"),
+        "path",
         F.col("content").alias("data"),
     ).repartition(500)
 
@@ -42,11 +50,17 @@ def create_test_dataframe(spark, base_dir: Path):
 
 def parse_args():
     """Parse command line arguments."""
+    home_dir = get_home_dir()
+    dataset_base_path = f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/data"
+
     parser = argparse.ArgumentParser(
-        description="Process images and metadata for a dataset stored on GCS."
+        description="Process test image dataset stored on PACE."
     )
     parser.add_argument(
-        "--cores", type=int, default=4, help="Number of cores used in Spark driver"
+        "--cores",
+        type=int,
+        default=os.cpu_count(),
+        help="Number of cores used in Spark driver",
     )
     parser.add_argument(
         "--memory",
@@ -57,39 +71,36 @@ def parse_args():
     parser.add_argument(
         "--image-root-path",
         type=str,
-        default=str(Path(".").resolve()),
+        default=f"{dataset_base_path}/test/",
         help="Base directory path for image data",
     )
     parser.add_argument(
         "--output-path",
         type=str,
-        default="gs://dsgt-clef-plantclef-2024/data/parquet_files/PlantCLEF2024_test",
-        help="GCS path for output Parquet files",
-    )
-    parser.add_argument(
-        "--dataset-name",
-        type=str,
-        default="PlantCLEF2024test",
-        help="Dataset name downloaded from tar file",
+        default=f"{dataset_base_path}/parquet_files/test",
+        help="PACE path for output Parquet files",
     )
 
     return parser.parse_args()
 
 
 def main():
-    """Main function that processes data and writes the output dataframe to GCS"""
+    """
+    Main function that processes data and writes the
+    output dataframe to plantclef directory on PACE.
+    """
     args = parse_args()
 
     # Initialize Spark
     spark = get_spark(cores=args.cores, memory=args.memory)
 
     # Convert raw-root-path to a Path object here
-    base_dir = Path(args.image_root_path) / "data" / args.dataset_name
+    image_base_path = Path(args.image_root_path)
 
     # Create test image dataframe
-    final_df = create_test_dataframe(spark=spark, base_dir=base_dir)
+    final_df = create_spark_test_dataframe(spark=spark, image_base_path=image_base_path)
 
-    # Write the DataFrame to GCS in Parquet format
+    # Write the DataFrame to PACE in Parquet format
     final_df.write.mode("overwrite").parquet(args.output_path)
 
 

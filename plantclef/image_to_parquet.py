@@ -72,7 +72,7 @@ def parse_args():
     dataset_base_path = f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/data"
 
     parser = argparse.ArgumentParser(
-        description="Process images and metadata for a dataset stored on GCS."
+        description="Process images and metadata for a dataset stored on PACE."
     )
     parser.add_argument(
         "--cores",
@@ -115,7 +115,10 @@ def parse_args():
 
 
 def main():
-    """Main function that processes data and writes the output dataframe to GCS"""
+    """
+    Main function that processes data and writes the
+    output dataframe to plantclef directory on PACE.
+    """
     args = parse_args()
 
     # Initialize Spark with settings for using the big-disk-dev VM
@@ -134,7 +137,7 @@ def main():
         metadata_filename=args.metadata_filename,
     )
 
-    # Write the DataFrame to GCS in Parquet format
+    # Write the DataFrame to PACE in Parquet format
     final_df.write.mode("overwrite").parquet(args.output_path)
 
 
