@@ -3,7 +3,7 @@ import pytest
 from PIL import Image
 from pyspark.sql import Row
 
-from plantclef.embedding.ml import WrappedFineTunedDINOv2
+from plantclef.embedding.transform import WrappedFineTunedDINOv2
 from plantclef.model_setup import setup_fine_tuned_model
 
 
@@ -31,9 +31,9 @@ def spark_df(spark):
 )
 def test_wrapped_finetuned_dinov2(spark_df, model_name, expected_dim):
     model = WrappedFineTunedDINOv2(
-        model_path=setup_fine_tuned_model(),
         input_col="img",
         output_col="transformed",
+        model_path=setup_fine_tuned_model(),
         model_name=model_name,
         batch_size=2,
     )

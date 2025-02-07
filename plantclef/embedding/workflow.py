@@ -9,7 +9,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from plantclef.model_setup import setup_fine_tuned_model
-from plantclef.embedding.ml import WrappedFineTunedDINOv2
+from plantclef.embedding.transform import WrappedFineTunedDINOv2
 from plantclef.spark import spark_resource
 from plantclef.config import get_data_dir
 
@@ -106,9 +106,9 @@ class ProcessFineTunedDINOv2(ProcessBase):
 
     def pipeline(self):
         dinov2_model = WrappedFineTunedDINOv2(
-            model_path=self.model_path,
             input_col="data",
             output_col="cls_embedding",
+            model_path=self.model_path,
         )
         return Pipeline(
             stages=[dinov2_model, SQLTransformer(statement=self.sql_statement)]

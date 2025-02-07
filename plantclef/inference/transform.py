@@ -1,11 +1,10 @@
 import io
 
-import numpy as np
 import timm
 import torch
 from PIL import Image
 from pyspark.ml import Transformer
-from pyspark.ml.functions import predict_batch_udf
+from pyspark.ml.param import Param, Params, TypeConverters
 from pyspark.ml.param.shared import HasInputCol, HasOutputCol
 from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
 from pyspark.sql import DataFrame
@@ -13,73 +12,48 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import ArrayType, FloatType, MapType, StringType
 
 
-class WrappedFineTunedDINOv2(
-    Transformer,
-    HasInputCol,
-    HasOutputCol,
-    DefaultParamsReadable,
-    DefaultParamsWritable,
-):
+class HasModelName(Param):
     """
-    Wrapper for fine-tuned DINOv2 to add it to the pipeline
+    Mixin for param model_name: str
     """
 
-    def __init__(
-        self,
-        model_path: str,
-        input_col: str = "input",
-        output_col: str = "output",
-        model_name: str = "vit_base_patch14_reg4_dinov2.lvd142m",
-        batch_size: int = 8,
-    ):
-        super().__init__()
-        self._setDefault(inputCol=input_col, outputCol=output_col)
-        self.model_path = model_path
-        self.model_name = model_name
-        self.batch_size = batch_size
-        self.num_classes = 7806  # total number of plant species
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = timm.create_model(
-            self.model_name,
-            pretrained=False,
-            num_classes=self.num_classes,
-            checkpoint_path=self.model_path,
+    modelName = Param(
+        Params._dummy(),
+        "modelName",
+        "The name of the DINOv2 model to use",
+        typeConverter=TypeConverters.toString,
+    )
+
+    def __init__(self):
+        super().__init__(
+            default="vit_base_patch14_reg4_dinov2.lvd142m",
+            doc="The name of the DINOv2 model to use",
         )
-        # Data transform
-        self.data_config = timm.data.resolve_model_data_config(self.model)
-        self.transforms = timm.data.create_transform(
-            **self.data_config, is_training=False
+
+    def getModelName(self) -> str:
+        return self.getOrDefault(self.modelName)
+
+
+class HasBatchSize(Param):
+    """
+    Mixin for param batch_size: int
+    """
+
+    batchSize = Param(
+        Params._dummy(),
+        "batchSize",
+        "The batch size to use for embedding extraction",
+        typeConverter=TypeConverters.toInt,
+    )
+
+    def __init__(self):
+        super().__init__(
+            default=8,
+            doc="The batch size to use for embedding extraction",
         )
-        # Move model to GPU if available
-        self.model.to(self.device)
 
-    def _make_predict_fn(self):
-        """Return PredictBatchFunction using a closure over the model"""
-
-        def predict(inputs: np.ndarray) -> np.ndarray:
-            images = [Image.open(io.BytesIO(input)) for input in inputs]
-            model_inputs = torch.stack(
-                [self.transforms(img).to(self.device) for img in images]
-            )
-
-            with torch.no_grad():
-                features = self.model.forward_features(model_inputs)
-                cls_token = features[:, 0, :]
-
-            numpy_array = cls_token.cpu().numpy()
-            return numpy_array
-
-        return predict
-
-    def _transform(self, df: DataFrame):
-        return df.withColumn(
-            self.getOutputCol(),
-            predict_batch_udf(
-                make_predict_fn=self._make_predict_fn,
-                return_type=ArrayType(FloatType()),
-                batch_size=self.batch_size,
-            )(self.getInputCol()),
-        )
+    def getBatchSize(self) -> int:
+        return self.getOrDefault(self.batchSize)
 
 
 class PretrainedDinoV2(
