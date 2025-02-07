@@ -7,7 +7,9 @@ pyspark >= 3.4.0
 pyarrow
 luigi
 aria2
-
+torch
+timm
+transformers
 
 # developer tools
 jupyterlab
