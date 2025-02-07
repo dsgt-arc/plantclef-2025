@@ -8,10 +8,10 @@ from pyspark.ml.functions import vector_to_array
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from plantclef.model_setup import setup_pretrained_model
-from plantclef.transforms import WrappedFineTunedDINOv2
+from plantclef.model_setup import setup_fine_tuned_model
+from plantclef.embedding.ml import WrappedFineTunedDINOv2
 from plantclef.spark import spark_resource
-from plantclef.config import get_pace_data_dir
+from plantclef.config import get_data_dir
 
 
 class ProcessBase(luigi.Task):
@@ -147,7 +147,7 @@ class Workflow(luigi.Task):
                 )
 
             # use fine-tuned DINOv2 model to extract embeddings from images
-            model_path = setup_pretrained_model(
+            model_path = setup_fine_tuned_model(
                 use_only_classifier=self.use_only_classifier
             )
             sql_statement = dino_cls_sql_statement
@@ -211,7 +211,7 @@ def parse_args():
 
 if __name__ == "__main__":
     # Get the base path for the PACE parquet files
-    dataset_base_path = get_pace_data_dir()
+    dataset_base_path = get_data_dir()
     # Input and output paths for training workflow
     # "~/p-dsgt_clef2025-0/shared/plantclef/data"
     input_path = f"{dataset_base_path}/parquet_files/train"
