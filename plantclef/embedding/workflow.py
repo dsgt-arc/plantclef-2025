@@ -2,7 +2,6 @@ from argparse import ArgumentParser
 
 import os
 import luigi
-import luigi.contrib.gcs
 from pyspark.ml import Pipeline, PipelineModel
 from pyspark.ml.feature import SQLTransformer
 from pyspark.ml.functions import vector_to_array
@@ -150,7 +149,7 @@ def parse_args():
         "--process-test-data",
         type=bool,
         default=False,
-        help="If True, set pipeline to process the test data and extract embeddings",
+        help="If True, set workflow to process the test data and extract embeddings",
     )
     parser.add_argument(
         "--use-grid",
@@ -164,8 +163,14 @@ def parse_args():
         default=False,
         help="""
         If True, use the pretrained ViT with frozen backbone, one classification head has been finetuned
-        Otherwise, use the only-classifier-then-all pretrained model,
+        Otherwise, use the only-classifier-then-all pretrained model
         """,
+    )
+    parser.add_argument(
+        "--scheduler-host",
+        type=None,
+        default=None,
+        help="""Scheduler host for the Luigi workflow""",
     )
     return parser.parse_args()
 
@@ -175,21 +180,27 @@ if __name__ == "__main__":
     dataset_base_path = get_data_dir()
     # Input and output paths for training workflow
     # "~/p-dsgt_clef2025-0/shared/plantclef/data"
-    input_path = f"{dataset_base_path}/parquet_files/train"
-    output_path = f"{dataset_base_path}/embeddings/train_embeddings"
+    # input_path = f"{dataset_base_path}/parquet_files/train"
+    # output_path = f"{dataset_base_path}/embeddings/train_embeddings"
+    input_path = f"{dataset_base_path}/parquet_files/subset_top20_train"
+    output_path = f"{dataset_base_path}/embeddings/subset_top20_embeddings"
     model_path = setup_fine_tuned_model(use_only_classifier=False)
     cpu_count = os.cpu_count()
 
     # parse args
     args = parse_args()
-    process_test_data = args.process_test_data
-    use_grid = args.use_grid
-    use_only_classifier = args.use_only_classifier
 
     # update input and output params for embedding the test data
-    if process_test_data:
+    if args.process_test_data:
         input_path = f"{dataset_base_path}/parquet_files/test"
         output_path = f"{dataset_base_path}/data/embeddings/test_embeddings"
+
+    # run the workflow
+    kwargs = {}
+    if args.scheduler_host:
+        kwargs["scheduler_host"] = args.scheduler_host
+    else:
+        kwargs["local_scheduler"] = True
 
     luigi.build(
         [
@@ -197,11 +208,11 @@ if __name__ == "__main__":
                 input_path=input_path,
                 output_path=output_path,
                 model_path=model_path,
-                process_test_data=process_test_data,
-                use_grid=use_grid,
-                use_only_classifier=use_only_classifier,
+                process_test_data=args.process_test_data,
+                use_grid=args.use_grid,
+                use_only_classifier=args.use_only_classifier,
                 cpu_count=cpu_count,
             )
         ],
-        scheduler_host="services.us-central1-a.c.dsgt-clef-2024.internal",
+        **kwargs,
     )
