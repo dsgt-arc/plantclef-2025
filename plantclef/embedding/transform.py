@@ -127,12 +127,16 @@ class WrappedFineTunedDINOv2(
         self.model.to(self.device)
 
     def _nvidia_smi(self):
-        from subprocess import run
+        from subprocess import run, PIPE
 
         try:
-            run(["nvidia-smi"], check=True)
-        except Exception:
-            pass
+            result = run(
+                ["nvidia-smi"], check=True, stdout=PIPE, stderr=PIPE, text=True
+            )
+            print("=== GPU Utilization (before/after prediction) ===")
+            print(result.stdout)
+        except Exception as e:
+            print(f"nvidia-smi failed: {e}")
 
     def _make_predict_fn(self):
         """Return PredictBatchFunction using a closure over the model"""

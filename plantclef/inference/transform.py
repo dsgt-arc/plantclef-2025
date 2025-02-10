@@ -3,6 +3,7 @@ import io
 import timm
 import torch
 from PIL import Image
+from plantclef.model_setup import setup_fine_tuned_model
 from pyspark.ml import Transformer
 from pyspark.ml.param import Param, Params, TypeConverters
 from pyspark.ml.param.shared import HasInputCol, HasOutputCol
@@ -10,6 +11,28 @@ from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import ArrayType, FloatType, MapType, StringType
+
+
+class HasModelPath(Param):
+    """
+    Mixin for param model_path: str
+    """
+
+    modelPath = Param(
+        Params._dummy(),
+        "modelPath",
+        "The path to the fine-tuned DINOv2 model",
+        typeConverter=TypeConverters.toString,
+    )
+
+    def __init__(self):
+        super().__init__(
+            default=setup_fine_tuned_model(),
+            doc="The path to the fine-tuned DINOv2 model",
+        )
+
+    def getModelPath(self) -> str:
+        return self.getOrDefault(self.modelPath)
 
 
 class HasModelName(Param):
@@ -60,34 +83,40 @@ class PretrainedDinoV2(
     Transformer,
     HasInputCol,
     HasOutputCol,
+    HasModelPath,
+    HasModelName,
+    HasBatchSize,
     DefaultParamsReadable,
     DefaultParamsWritable,
 ):
     def __init__(
         self,
-        model_path: str,
         input_col: str = "input",
         output_col: str = "output",
+        model_path: str = setup_fine_tuned_model(),
         model_name: str = "vit_base_patch14_reg4_dinov2.lvd142m",
         batch_size: int = 8,
         grid_size: int = 3,
         use_grid: bool = False,
     ):
         super().__init__()
-        self._setDefault(inputCol=input_col, outputCol=output_col)
-        self.model_name = model_name
-        self.batch_size = batch_size
-        self.model_path = model_path
+        self._setDefault(
+            inputCol=input_col,
+            outputCol=output_col,
+            modelPath=model_path,
+            modelName=model_name,
+            batchSize=batch_size,
+        )
         self.num_classes = 7806  # total number of plant species
         self.local_directory = "/mnt/data/models/pretrained_models"
         self.class_mapping_file = f"{self.local_directory}/class_mapping.txt"
         # Model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = timm.create_model(
-            self.model_name,
+            self.modelName,
             pretrained=False,
             num_classes=self.num_classes,
-            checkpoint_path=self.model_path,
+            checkpoint_path=self.modelPath,
         )
         self.model.to(self.device)
         self.model.eval()
