@@ -1,12 +1,14 @@
 import io
 import pytest
 import torch
+import luigi
 import platform
 import subprocess
 from PIL import Image
 from pyspark.sql import Row
 
-from plantclef.embedding.transform import WrappedFineTunedDINOv2
+from plantclef.embedding.workflow import ProcessEmbeddings
+from plantclef.spark import get_spark
 from plantclef.model_setup import setup_fine_tuned_model
 
 
@@ -36,8 +38,8 @@ def spark_df(spark):
 
     df = spark.createDataFrame(
         [
-            Row(img=img_bytes),
-            Row(img=img_bytes),
+            Row(image_name="123.jpg", species_id=1, data=img_bytes),
+            Row(image_name="456.jpg", species_id=2, data=img_bytes),
         ]
     )
     print("Initial number of partitions:", df.rdd.getNumPartitions())
@@ -47,13 +49,15 @@ def spark_df(spark):
     return df
 
 
-@pytest.mark.parametrize(
-    "model_name,expected_dim",
-    [
-        ("vit_base_patch14_reg4_dinov2.lvd142m", 768),  # Adjust output dim if needed
-    ],
-)
-def test_wrapped_finetuned_dinov2_gpu(spark_df, model_name, expected_dim):
+@pytest.fixture
+def temp_parquet(spark_df, tmp_path):
+    """Write the Spark DataFrame to a temporary parquet directory."""
+    path = tmp_path / "data"
+    spark_df.write.parquet(path.as_posix())
+    return path
+
+
+def test_gpu_process_embeddings(spark, spark_df, temp_parquet, tmp_path):
     # Check if CUDA is available
     assert (
         torch.cuda.is_available()
@@ -79,25 +83,37 @@ def test_wrapped_finetuned_dinov2_gpu(spark_df, model_name, expected_dim):
     print("Spark DataFrame Number of Partitions:", spark_df.rdd.getNumPartitions())
 
     # ----------------------------
-    # 3: Model Initialization
+    # 3: Build and Run Luigi Task for Embeddings
     # ----------------------------
-    model = WrappedFineTunedDINOv2(
-        input_col="img",
-        output_col="transformed",
+    output = tmp_path / "output"
+    task = ProcessEmbeddings(
+        input_path=temp_parquet.as_posix(),
+        output_path=output.as_posix(),
         model_path=setup_fine_tuned_model(),
-        model_name=model_name,
-        batch_size=2,
+        sample_col="species_id",
+        num_partitions=1,
+        sample_id=0,
+        num_sample_id=1,
+        cpu_count=4,
+        sql_statement="SELECT image_name, species_id, cls_embedding FROM __THIS__",
     )
+    luigi.build([task], local_scheduler=True)
 
-    print("=== AFTER MODEL INITIALIZATION ===")
+    # ----------------------------
+    # 4: Restart Spark Session
+    # ----------------------------
+    # restart spark since luigi kills the spark session
+    spark = get_spark(app_name="pytest")
+
+    print("=== AFTER MODEL INITIALIZATION (Post-Luigi) ===")
     print("GPU Memory Summary (after model init):")
     print(torch.cuda.memory_summary())
     print_nvidia_smi()
 
     # ----------------------------
-    # 4: Run Transformation and Debug
+    # 5: Read and Debug Transformed Data
     # ----------------------------
-    transformed = model.transform(spark_df).cache()
+    transformed = spark.read.parquet(f"{output}/data")
 
     print("=== AFTER TRANSFORMATION CALL ===")
     print("GPU Memory Summary (after transform call):")
@@ -113,27 +129,16 @@ def test_wrapped_finetuned_dinov2_gpu(spark_df, model_name, expected_dim):
         raise
 
     # ----------------------------
-    # 5: Check Transformed DataFrame
+    # 6: Verify Transformed DataFrame
     # ----------------------------
     assert count == 2, "Expected 2 rows in transformed DataFrame."
-    assert transformed.columns == [
-        "img",
-        "transformed",
-    ], "Unexpected columns in transformed DataFrame."
-
-    row = transformed.select("transformed").first()
-    assert isinstance(row.transformed, list), "Transformed column is not a list."
+    expected_columns = ["image_name", "species_id", "cls_embedding", "sample_id"]
     assert (
-        len(row.transformed) == expected_dim
-    ), f"Expected embedding length {expected_dim}."
+        transformed.columns == expected_columns
+    ), f"Unexpected columns in transformed DataFrame. Expected {expected_columns}, got {transformed.columns}"
+
+    row = transformed.select("cls_embedding").first()
+    assert len(row.cls_embedding) == 768, "Expected embedding length 768."
     assert all(
-        isinstance(x, float) for x in row.transformed
+        isinstance(x, float) for x in row.cls_embedding
     ), "Not all elements in embedding are floats."
-
-    # ----------------------------
-    # 6: Check Model GPU Placement
-    # ----------------------------
-    for param in model.model.parameters():
-        assert param.device.type == "cuda", "Model parameters are not on GPU."
-
-    print("GPU utilization confirmed.")

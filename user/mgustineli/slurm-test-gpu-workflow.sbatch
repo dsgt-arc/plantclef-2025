@@ -40,4 +40,4 @@ export PYSPARK_DRIVER_MEMORY=16g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Pytest script
-pytest -vv -s ~/clef/plantclef-2025/tests/test_gpu_transform.py
+pytest -vv -s ~/clef/plantclef-2025/tests/test_gpu_workflow.py
