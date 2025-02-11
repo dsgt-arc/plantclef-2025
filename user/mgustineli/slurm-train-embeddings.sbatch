@@ -1,7 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=plantclef-dinov2-embedding   # Job name
 #SBATCH --account=paceship-dsgt_clef2025        # charge account
-#SBATCH -N1 --gres=gpu:V100:1                   # Number of nodes and cores required
+#SBATCH --nodes=1                               # Number of nodes
+#SBATCH --ntasks-per-node=12                    # Number of tasks per node
+#SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
 #SBATCH --cpus-per-task=4                       # Number of cores per task
 #SBATCH --mem-per-gpu=32G                       # Memory per core
 #SBATCH --time=10:00:00                         # Duration of the job (8 hours)
