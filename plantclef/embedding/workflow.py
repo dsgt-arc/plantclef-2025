@@ -45,6 +45,8 @@ class ProcessEmbeddings(luigi.Task):
     output_path = luigi.Parameter()
     model_path = luigi.Parameter(default=setup_fine_tuned_model())
     sample_col = luigi.Parameter(default="species_id")
+    # controls the number of partitions written to disk, must be at least the number
+    # of tasks that we have in parallel to best take advantage of disk
     num_partitions = luigi.OptionalIntParameter(default=500)
     sample_id = luigi.OptionalIntParameter(default=None)
     num_sample_id = luigi.OptionalIntParameter(default=20)
@@ -77,15 +79,6 @@ class ProcessEmbeddings(luigi.Task):
     def transform(self, model, df, features) -> DataFrame:
         transformed = model.transform(df)
 
-        transformed = (
-            transformed.withColumn(
-                "sample_id",
-                F.crc32(F.col(self.sample_col).cast("string")) % self.num_sample_id,
-            )
-            .where(F.col("sample_id") == self.sample_id)
-            .drop("sample_id")
-        )
-
         for c in features:
             # check if the feature is a vector and convert it to an array
             if "array" in transformed.schema[c].simpleString():
@@ -99,10 +92,31 @@ class ProcessEmbeddings(luigi.Task):
             "spark.sql.shuffle.partitions": self.num_partitions,
         }
         with spark_resource(**kwargs) as spark:
-            df = spark.read.parquet(self.input_path)
+            # read the data and keep the sample we're currently processing
+            df = (
+                spark.read.parquet(self.input_path)
+                .withColumn(
+                    "sample_id",
+                    F.crc32(F.col(self.sample_col).cast("string")) % self.num_sample_id,
+                )
+                .where(F.col("sample_id") == self.sample_id)
+                .drop("sample_id")
+            )
+
+            # === CRUCIAL CHANGE ===
+            # To avoid out-of-memory errors on the GPU, coalesce the DataFrame to 1 partition
+            # This ensures that only one task runs the GPU inference at a time
+            print("Initial number of partitions:", df.rdd.getNumPartitions())
+            # Coalesce to 1 partition to force serialization of GPU tasks
+            df = df.coalesce(1)
+            print(
+                "Number of partitions after coalescing for GPU inference:",
+                df.rdd.getNumPartitions(),
+            )
 
             model = PipelineModel.load(f"{self.output_path}/model")
             model.write().overwrite().save(f"{self.output_path}/model")
+            # transform the dataframe and write to disk
             transformed = self.transform(model, df, self.feature_columns)
 
             transformed.repartition(self.num_partitions).write.mode(
