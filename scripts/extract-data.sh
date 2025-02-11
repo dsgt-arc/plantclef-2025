@@ -23,7 +23,7 @@ DEST_DIR=${1:-"$HOME/p-dsgt_clef2025-0/shared/plantclef/data"}
 TRAIN_DIR="$DEST_DIR/train"
 TEST_DIR="$DEST_DIR/test"
 METADATA_DIR="$DEST_DIR/metadata"
-MODELS_DIR="$DEST_DIR/models"
+MODELS_DIR=${1:-"$HOME/p-dsgt_clef2025-0/shared/plantclef/models"}
 
 # Ensure directories exist
 for dir in "$TRAIN_DIR" "$TEST_DIR" "$METADATA_DIR" "$MODELS_DIR"; do
