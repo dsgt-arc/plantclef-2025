@@ -18,6 +18,7 @@ class ProcessDINOv2Pipeline(luigi.Task):
     output_path = luigi.Parameter()
     sql_statement = luigi.Parameter()
     model_path = luigi.Parameter(default=setup_fine_tuned_model())
+    batch_size = luigi.IntParameter(default=32)
 
     def output(self):
         return luigi.LocalTarget(f"{self.output_path}/metadata/_SUCCESS")
@@ -27,6 +28,7 @@ class ProcessDINOv2Pipeline(luigi.Task):
             input_col="data",
             output_col="cls_embedding",
             model_path=self.model_path,
+            batch_size=self.batch_size,
         )
         return Pipeline(
             stages=[dinov2_model, SQLTransformer(statement=self.sql_statement)]
@@ -46,6 +48,7 @@ class ProcessEmbeddings(luigi.Task):
     num_partitions = luigi.OptionalIntParameter(default=500)
     sample_id = luigi.OptionalIntParameter(default=None)
     num_sample_id = luigi.OptionalIntParameter(default=20)
+    batch_size = luigi.IntParameter(default=32)
     cpu_count = luigi.IntParameter(default=4)
     sql_statement = luigi.Parameter(
         default="SELECT image_name, species_id, cls_embedding FROM __THIS__"
@@ -63,6 +66,7 @@ class ProcessEmbeddings(luigi.Task):
                 output_path=f"{self.output_path}/model",
                 sql_statement=self.sql_statement,
                 model_path=self.model_path,
+                batch_size=self.batch_size,
             )
         ]
 
@@ -114,6 +118,7 @@ class Workflow(luigi.Task):
     use_grid = luigi.OptionalBoolParameter(default=False)
     use_only_classifier = luigi.OptionalBoolParameter(default=False)
     cpu_count = luigi.IntParameter(default=4)
+    batch_size = luigi.IntParameter(default=32)
 
     def run(self):
         # training workflow parameters
@@ -135,6 +140,7 @@ class Workflow(luigi.Task):
                 num_partitions=500,
                 sample_id=i,
                 num_sample_id=20,
+                batch_size=self.batch_size,
                 cpu_count=self.cpu_count,
                 sql_statement=sql_statement,
             )
@@ -145,6 +151,12 @@ class Workflow(luigi.Task):
 def parse_args():
     """Parse command-line arguments."""
     parser = ArgumentParser(description="Luigi pipeline")
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=32,
+        help="The batch size to use for embedding extraction",
+    )
     parser.add_argument(
         "--process-test-data",
         type=bool,
@@ -212,6 +224,7 @@ if __name__ == "__main__":
                 use_grid=args.use_grid,
                 use_only_classifier=args.use_only_classifier,
                 cpu_count=cpu_count,
+                batch_size=args.batch_size,
             )
         ],
         **kwargs,
