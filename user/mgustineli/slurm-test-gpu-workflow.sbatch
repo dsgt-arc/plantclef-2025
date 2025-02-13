@@ -13,7 +13,7 @@
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
 set -xe
-
+# Activate the environment
 source ~/clef/plantclef-2025/scripts/activate
 
 # Print job info
