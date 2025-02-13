@@ -44,7 +44,7 @@ def spark_df(spark):
     )
     print("Initial number of partitions:", df.rdd.getNumPartitions())
     # Coalesce to 1 partition to force serialization of GPU tasks.
-    df = df.coalesce(1)
+    # df = df.coalesce(1)
     print("Number of partitions after coalesce:", df.rdd.getNumPartitions())
     return df
 
@@ -94,7 +94,7 @@ def test_gpu_process_embeddings(spark, spark_df, temp_parquet, tmp_path):
         num_partitions=1,
         sample_id=0,
         num_sample_id=1,
-        cpu_count=4,
+        cpu_count=1,
         sql_statement="SELECT image_name, species_id, cls_embedding FROM __THIS__",
     )
     luigi.build([task], local_scheduler=True)
@@ -103,7 +103,11 @@ def test_gpu_process_embeddings(spark, spark_df, temp_parquet, tmp_path):
     # 4: Restart Spark Session
     # ----------------------------
     # restart spark since luigi kills the spark session
-    spark = get_spark(app_name="pytest")
+    kwargs = {
+        "cores": 1,
+        "spark.sql.shuffle.partitions": 1,
+    }
+    spark = get_spark(app_name="pytest", **kwargs)
 
     print("=== AFTER MODEL INITIALIZATION (Post-Luigi) ===")
     print("GPU Memory Summary (after model init):")

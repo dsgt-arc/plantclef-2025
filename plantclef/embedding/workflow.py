@@ -91,6 +91,7 @@ class ProcessEmbeddings(luigi.Task):
             "cores": self.cpu_count,
             "spark.sql.shuffle.partitions": self.num_partitions,
         }
+        print(f"Running task with kwargs: {kwargs}")
         with spark_resource(**kwargs) as spark:
             # read the data and keep the sample we're currently processing
             df = (
@@ -103,12 +104,9 @@ class ProcessEmbeddings(luigi.Task):
                 .drop("sample_id")
             )
 
-            # === CRUCIAL CHANGE ===
-            # To avoid out-of-memory errors on the GPU, coalesce the DataFrame to 1 partition
-            # This ensures that only one task runs the GPU inference at a time
             print("Initial number of partitions:", df.rdd.getNumPartitions())
             # Coalesce to 1 partition to force serialization of GPU tasks
-            df = df.coalesce(1)
+            # df = df.coalesce(1)
             print(
                 "Number of partitions after coalescing for GPU inference:",
                 df.rdd.getNumPartitions(),

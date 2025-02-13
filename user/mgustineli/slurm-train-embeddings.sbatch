@@ -2,9 +2,9 @@
 #SBATCH --job-name=plantclef-dinov2-embedding   # Job name
 #SBATCH --account=paceship-dsgt_clef2025        # charge account
 #SBATCH --nodes=1                               # Number of nodes
-#SBATCH --ntasks-per-node=6                     # Number of tasks per node
+#SBATCH --ntasks-per-node=1                     # Number of tasks per node
 #SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
-#SBATCH --cpus-per-task=4                       # Number of cores per task
+#SBATCH --cpus-per-task=12                      # Number of cores per task
 #SBATCH --mem-per-gpu=32G                       # Memory per core
 #SBATCH --time=10:00:00                         # Duration of the job (8 hours)
 #SBATCH --qos=inferno                           # QOS Name
@@ -38,7 +38,7 @@ python -c "import torch; print(torch.cuda.is_available())"  # Check if PyTorch c
 nvidia-smi                                                  # Check GPU usage
 
 # Set environment variables
-export PYSPARK_DRIVER_MEMORY=16g
+export PYSPARK_DRIVER_MEMORY=30g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Python script

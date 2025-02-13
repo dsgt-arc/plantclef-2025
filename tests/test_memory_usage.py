@@ -34,6 +34,8 @@ def test_model_memory_usage():
     """
     process = psutil.Process(os.getpid())
     mem_before = process.memory_info().rss
+    cpu_count = os.cpu_count()
+    print("Number of CPUs:", cpu_count)
 
     # instantiate the model (CPU-side)
     _ = WrappedFineTunedDINOv2(
@@ -85,7 +87,7 @@ def test_image_memory_usage(spark_df):
     - Computes the size of the resulting tensor in bytes.
     - Also estimates the GPU memory increase when transferring that tensor.
     """
-    # Instantiate the model to access its transform and device
+    # instantiate the model to access its transform and device
     model = WrappedFineTunedDINOv2(
         input_col="img",
         output_col="transformed",
@@ -94,7 +96,7 @@ def test_image_memory_usage(spark_df):
         batch_size=1,
     )
 
-    # Apply the transformation to the dummy image
+    # apply the transformation to the dummy image
     transformed_df = model.transform(spark_df)
 
     # extract the transformed tensor from the DataFrame
@@ -110,7 +112,7 @@ def test_image_memory_usage(spark_df):
         )
     )
 
-    # Alternatively, measure GPU memory before and after transferring the image
+    # measure GPU memory before and after transferring the image
     torch.cuda.empty_cache()
     base_gpu = torch.cuda.memory_allocated()
     row_gpu = transformed_df.select("transformed").first()
@@ -125,8 +127,6 @@ def test_image_memory_usage(spark_df):
 
     print("Transformed tensor shape:", dummy_tensor.shape)
 
-    # A common configuration for ViT-like models is to resize images to (3, 224, 224).
-    # However, your transform might be different; adjust assertions as needed.
     assert (
         dummy_tensor.shape[0] == 768
     ), "Expected 768 dimensions in transformed image tensor."

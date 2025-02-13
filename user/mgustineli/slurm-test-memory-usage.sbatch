@@ -6,7 +6,7 @@
 #SBATCH --gres=gpu:1                            # GPU resource
 #SBATCH -C RTX6000                              # GPU type
 #SBATCH --cpus-per-task=1                       # Number of cores per task
-#SBATCH --mem-per-gpu=16G                        # Memory per core
+#SBATCH --mem-per-gpu=8G                       # Memory per core
 #SBATCH --time=2:00:00                          # Duration of the job (2 hours)
 #SBATCH --qos=inferno                           # QOS Name
 #SBATCH -oReport-%j.out                         # Combined output and error messages file
@@ -39,7 +39,7 @@ python -c "import torch; print(torch.cuda.is_available())"  # Check if PyTorch c
 nvidia-smi                                                  # Check GPU usage
 
 # Set environment variables
-export PYSPARK_DRIVER_MEMORY=16g
+export PYSPARK_DRIVER_MEMORY=6g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Pytest script
