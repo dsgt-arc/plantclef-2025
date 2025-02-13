@@ -11,6 +11,9 @@ dynamic = ["dependencies"]
 Homepage = "https://github.com/dsgt-kaggle-clef/plantclef-2025"
 Issues = "https://github.com/dsgt-kaggle-clef/plantclef-2025/issues"
 
+[project.scripts]
+plantclef = "plantclef.cli:app"
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
@@ -22,3 +25,6 @@ dependencies = { file = "requirements.txt" }
 where = ["."]
 include = ["plantclef*"]
 namespaces = false
+
+[tool.uv]
+cache-dir = "~/scratch/uv-cache"

@@ -4,3 +4,4 @@
 set +eux
 mkdir -p logs
 mv Report* logs/
+mv nvidia-logs* logs/
