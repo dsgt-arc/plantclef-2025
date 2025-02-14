@@ -4,22 +4,26 @@
 # running any other scripts in this directory.
 #
 # Run with:
-#    source scripts/activate
-#
+#    source scripts/activate.sh
 
-SCRIPT_PARENT_ROOT=$(
-    dirname ${BASH_SOURCE[0]} | realpath $(cat -)
-)
+set -euo pipefail
 
-# adds the scripts directory to the path
-PATH="$PATH:$SCRIPT_PARENT_ROOT"
-# for large models and datasets from huggingface/transformers
-PYTEST_DEBUG_TEMPROOT=~/scratch/pytest-tmp
-mkdir -p $PYTEST_DEBUG_TEMPROOT
+# Determine the directory of this script
+SCRIPT_PARENT_ROOT="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
-# NOTE: uv cache is set by pyproject.toml
-source $SCRIPT_PARENT_ROOT/utils/slurm-venv.sh
+# Add the scripts directory to the PATH
+export PATH="$PATH:$SCRIPT_PARENT_ROOT"
 
-# exports
-export PATH
+# Set the temporary root for pytest (using $HOME instead of ~ for better portability)
+PYTEST_DEBUG_TEMPROOT="$HOME/scratch/pytest-tmp"
+mkdir -p "$PYTEST_DEBUG_TEMPROOT"
 export PYTEST_DEBUG_TEMPROOT
+
+# Source the SLURM virtual environment setup script
+SLURM_VENV_SCRIPT="$SCRIPT_PARENT_ROOT/utils/slurm-venv.sh"
+if [[ -f "$SLURM_VENV_SCRIPT" ]]; then
+    source "$SLURM_VENV_SCRIPT"
+else
+    echo "Error: $SLURM_VENV_SCRIPT not found." >&2
+    exit 1
+fi

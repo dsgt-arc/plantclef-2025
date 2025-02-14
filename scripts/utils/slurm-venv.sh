@@ -1,32 +1,57 @@
 #!/usr/bin/env bash
 # usage: source scripts/slurm-venv.sh [venv_root]
-SCRIPT_PARENT_ROOT=$(
-    dirname ${BASH_SOURCE[0]} \
-    | dirname $(cat -) \
-    | realpath $(cat -)
-)
 
-# choose the module depending if this being run on slurm or not
-MODULE_PATH=$(dirname $SCRIPT_PARENT_ROOT)
-# MODULE_PATH=${SLURM_SUBMIT_DIR:-$MODULE_PATH}
-# optional argument to specify the venv root
-VENV_PARENT_ROOT=${1:-~/scratch/plantclef}
-VENV_PARENT_ROOT=$(realpath $VENV_PARENT_ROOT)
+set -euo pipefail
 
-# use an updated version of python and set the include path for wheels
+# Determine the directory of this script.
+# Assuming this script is located at: PROJECT_ROOT/scripts/utils/slurm-venv.sh
+SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+# The project root is two levels up (from scripts/utils to scripts, then to project root)
+PROJECT_ROOT="$(realpath "$(dirname "$(dirname "$SCRIPT_DIR")")")"
+echo "Project root: $PROJECT_ROOT"
+
+# Optional argument to specify the virtual environment root (default: ~/scratch/plantclef)
+VENV_PARENT_ROOT="${1:-$HOME/scratch/plantclef}"
+VENV_PARENT_ROOT="$(realpath "$VENV_PARENT_ROOT")"
+
+# Load the required Python module
 module load python/3.10
-export CPATH=$PYTHON_ROOT/include/python3.10:$CPATH
 
-# create a virtual environment with uv
-python -m pip install --upgrade pip uv
-mkdir -p $VENV_PARENT_ROOT
-pushd $VENV_PARENT_ROOT
-uv venv
-source .venv/bin/activate
+# Set CPATH to include Python’s include directory
+PYTHON_ROOT=$(python -c 'import sys; print(sys.base_prefix)')
+export CPATH="${PYTHON_ROOT}/include/python3.10:${CPATH:-}"
 
-# check for NO_REINSTALL flag
+# Ensure pip is installed and upgrade pip
+python -m ensurepip --default-pip
+python -m pip install --upgrade pip
+
+# Create the virtual environment directory if it doesn't exist
+mkdir -p "$VENV_PARENT_ROOT"
+pushd "$VENV_PARENT_ROOT" > /dev/null
+
+# Create and activate the virtual environment
+echo "Creating virtual environment in ${VENV_PARENT_ROOT}/venv ..."
+python -m venv venv
+source venv/bin/activate
+
+# Verify the environment setup
+echo "Python Path: $(which python)"
+echo "Python Version: $(python --version)"
+echo "Pip Path: $(which pip)"
+echo "Pip Version: $(pip --version)"
+
+# Install dependencies unless NO_REINSTALL is set
 if [[ -z ${NO_REINSTALL:-} ]]; then
-    uv pip install -r $MODULE_PATH/requirements.txt
-    uv pip install -e $MODULE_PATH
+    echo "Installing required packages..."
+    pip install --upgrade pip
+    # Look for requirements.txt in the project root
+    if [[ -f "$PROJECT_ROOT/requirements.txt" ]]; then
+        pip install -r "$PROJECT_ROOT/requirements.txt"
+    else
+        echo "Warning: $PROJECT_ROOT/requirements.txt not found."
+    fi
+    # Install the project in editable mode from the project root (where pyproject.toml resides)
+    pip install -e "$PROJECT_ROOT"
 fi
-popd
+
+popd > /dev/null

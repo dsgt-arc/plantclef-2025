@@ -49,7 +49,7 @@ class ProcessEmbeddings(luigi.Task):
     # of tasks that we have in parallel to best take advantage of disk
     num_partitions = luigi.OptionalIntParameter(default=500)
     sample_id = luigi.OptionalIntParameter(default=None)
-    num_sample_id = luigi.OptionalIntParameter(default=20)
+    num_sample_id = luigi.OptionalIntParameter(default=50)
     batch_size = luigi.IntParameter(default=32)
     cpu_count = luigi.IntParameter(default=4)
     sql_statement = luigi.Parameter(
@@ -106,7 +106,7 @@ class ProcessEmbeddings(luigi.Task):
 
             print("Initial number of partitions:", df.rdd.getNumPartitions())
             # Coalesce to 1 partition to force serialization of GPU tasks
-            # df = df.coalesce(1)
+            df = df.coalesce(1)
             print(
                 "Number of partitions after coalescing for GPU inference:",
                 df.rdd.getNumPartitions(),

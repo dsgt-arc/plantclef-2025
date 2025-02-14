@@ -12,9 +12,8 @@
 #SBATCH -oReport-%j.out                         # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
+
 set -xe
-# Activate the environment
-source ~/clef/plantclef-2025/scripts/activate
 
 # Print job info
 echo "Job ID: $SLURM_JOB_ID"
@@ -22,19 +21,27 @@ echo "Hostname: $(hostname)"
 echo "Number of CPUs: $(nproc)"
 echo "Available memory: $(free -h)"
 
-# Check GPU availability
-python -c "import torch; print(torch.cuda.is_available())"  # Check if PyTorch can access the GPU
-nvidia-smi                                                  # Check GPU usage
+# Activate the environment
+source ~/clef/plantclef-2025/scripts/activate.sh
 
-# start the nvidia monitoring job in the background using slurm job id
+# Check GPU availability
+python -c "import torch; print(torch.cuda.is_available())"
+nvidia-smi
+
+# start the nvidia monitoring job in the background using SLURM job id
 NVIDIA_LOG_FILE=Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
-nvidia-logs monitor $NVIDIA_LOG_FILE &
+python ~/clef/plantclef-2025/scripts/nvidia-logs.sh monitor "$NVIDIA_LOG_FILE" &
 nvidia_logs_pid=$!
+echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
+
 
 # Set environment variables
-export PYSPARK_DRIVER_MEMORY=160g
-export PYSPARK_EXECUTOR_MEMORY=160g
+export PYSPARK_DRIVER_MEMORY=16g
+export PYSPARK_EXECUTOR_MEMORY=16g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Pytest script
 pytest -vv -s ~/clef/plantclef-2025/tests/test_gpu_transform.py
+
+# Get the GPU utilization plots
+python ~/clef/plantclef-2025/scripts/nvidia-logs.sh parse Report-${SLURM_JOB_ID}-nvidia-logs.ndjson

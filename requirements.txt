@@ -10,6 +10,7 @@ aria2
 torch
 timm
 transformers
+typer
 
 # developer tools
 jupyterlab
