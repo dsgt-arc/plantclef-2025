@@ -34,7 +34,6 @@ python ~/clef/plantclef-2025/scripts/nvidia-logs.sh monitor "$NVIDIA_LOG_FILE" &
 nvidia_logs_pid=$!
 echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
 
-
 # Set environment variables
 export PYSPARK_DRIVER_MEMORY=16g
 export PYSPARK_EXECUTOR_MEMORY=16g
