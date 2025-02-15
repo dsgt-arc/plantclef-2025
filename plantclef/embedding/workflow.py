@@ -18,7 +18,7 @@ class ProcessDINOv2Pipeline(luigi.Task):
     output_path = luigi.Parameter()
     sql_statement = luigi.Parameter()
     model_path = luigi.Parameter(default=setup_fine_tuned_model())
-    batch_size = luigi.IntParameter(default=32)
+    batch_size = luigi.IntParameter(default=1)
 
     def output(self):
         return luigi.LocalTarget(f"{self.output_path}/metadata/_SUCCESS")
@@ -106,7 +106,7 @@ class ProcessEmbeddings(luigi.Task):
 
             print("Initial number of partitions:", df.rdd.getNumPartitions())
             # Coalesce to 1 partition to force serialization of GPU tasks
-            df = df.coalesce(1)
+            # df = df.coalesce(1)
             print(
                 "Number of partitions after coalescing for GPU inference:",
                 df.rdd.getNumPartitions(),
@@ -130,7 +130,7 @@ class Workflow(luigi.Task):
     use_grid = luigi.OptionalBoolParameter(default=False)
     use_only_classifier = luigi.OptionalBoolParameter(default=False)
     cpu_count = luigi.IntParameter(default=4)
-    batch_size = luigi.IntParameter(default=32)
+    batch_size = luigi.IntParameter(default=1)
 
     def run(self):
         # training workflow parameters
@@ -166,7 +166,7 @@ def parse_args():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=32,
+        default=1,
         help="The batch size to use for embedding extraction",
     )
     parser.add_argument(

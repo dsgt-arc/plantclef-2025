@@ -13,7 +13,7 @@
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
 
 # for parallel runs, break into 10 jobs 10 at a time e.g.
-#SBATCH --array=0-9%10
+##SBATCH --array=0-9%10
 
 set -xe
 # Print job info
@@ -41,7 +41,7 @@ export PYSPARK_EXECUTOR_MEMORY=160g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Python script
-python ~/clef/plantclef-2025/plantclef/embedding/workflow.py
+python ~/clef/plantclef-2025/plantclef/embedding/workflow.py --batch-size 1
 
 # Get the GPU utilization plots
 python ~/clef/plantclef-2025/scripts/nvidia-logs.sh parse Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
