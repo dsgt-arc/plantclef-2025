@@ -4,11 +4,11 @@
 #SBATCH --nodes=1                               # Number of nodes
 #SBATCH --ntasks-per-node=1                     # Number of tasks per node
 #SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
-#SBATCH --cpus-per-task=12                      # Number of cores per task
+#SBATCH --cpus-per-task=6                       # Number of cores per task
 #SBATCH --mem-per-gpu=192G                      # Memory per core
 #SBATCH --time=10:00:00                         # Duration of the job (8 hours)
 #SBATCH --qos=inferno                           # QOS Name
-#SBATCH -oReport-%j.out                         # Combined output and error messages file
+#SBATCH -oReport-%j.log                         # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
 
@@ -36,8 +36,8 @@ nvidia_logs_pid=$!
 echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
 
 # Set environment variables
-export PYSPARK_DRIVER_MEMORY=160g
-export PYSPARK_EXECUTOR_MEMORY=160g
+export PYSPARK_DRIVER_MEMORY=20g
+export PYSPARK_EXECUTOR_MEMORY=200g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Python script

@@ -45,6 +45,7 @@ def monitor(output: str, interval: int = 30, verbose: bool = False):
 def parse(input: str):
     """Parses nvidia-logs.ndjson."""
     from pyspark.sql import SparkSession, functions as F
+    from pyspark.sql.types import ArrayType, StructType, StructField, StringType
     from matplotlib import pyplot as plt
     from datetime import datetime
 
@@ -89,21 +90,32 @@ def parse(input: str):
     utilpd.to_csv(output_csv, index=False)
     print(f"Saved utilization data to {output_csv}", flush=True)
 
-    # Check the data type of process_info in the schema
+    # Define the schema for process info
+    process_schema = StructType([
+        StructField("compute_instance_id", StringType(), True),
+        StructField("gpu_instance_id", StringType(), True),
+        StructField("pid", StringType(), True),
+        StructField("process_name", StringType(), True),
+        StructField("type", StringType(), True),
+        StructField("used_memory", StringType(), True)
+    ])
+
+    # Choose the correct column for explosion:
     if isinstance(sub.schema["process_info"].dataType, ArrayType):
         process_col = F.explode("process_info")
     else:
         # Wrap the struct in an array if it's not already an array
         process_col = F.explode(F.array("process_info"))
 
-    # Generate and save process statistics
     output_process = input.replace(".ndjson", "-processes.csv")
     (
         sub.select(
             "timestamp",
-            process_col.alias("process"),
+            process_col.alias("process")
         )
-        .withColumn("used_memory_mb", F.split("process.used_memory", " ")[0].cast("int"))
+        # Force conversion: if 'process' is a string, convert it to a struct using the defined schema.
+        .withColumn("process", F.from_json(F.col("process"), process_schema))
+        .withColumn("used_memory_mb", F.split(F.col("process.used_memory"), " ")[0].cast("int"))
         .groupBy("process.pid")
         .agg(
             F.min("timestamp").alias("start"),
@@ -112,7 +124,7 @@ def parse(input: str):
             F.min("used_memory_mb").alias("min_used_memory_mb"),
             F.max("used_memory_mb").alias("max_used_memory_mb"),
             F.avg("used_memory_mb").alias("avg_used_memory_mb"),
-            F.stddev("used_memory_mb").alias("stddev_used_memory_mb"),
+            F.stddev("used_memory_mb").alias("stddev_used_memory_mb")
         )
         .withColumn("duration_sec", F.col("end") - F.col("start"))
         .orderBy("pid")

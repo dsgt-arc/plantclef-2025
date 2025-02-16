@@ -1,6 +1,5 @@
 from argparse import ArgumentParser
 
-import os
 import luigi
 from pyspark.ml import Pipeline, PipelineModel
 from pyspark.ml.feature import SQLTransformer
@@ -164,6 +163,18 @@ def parse_args():
     """Parse command-line arguments."""
     parser = ArgumentParser(description="Luigi pipeline")
     parser.add_argument(
+        "--input-dataset-name",
+        type=str,
+        default="subset_top10_train",
+        help="The number of CPUs to use for the Spark job",
+    )
+    parser.add_argument(
+        "--cpu-count",
+        type=int,
+        default=4,
+        help="The number of CPUs to use for the Spark job",
+    )
+    parser.add_argument(
         "--batch-size",
         type=int,
         default=1,
@@ -200,24 +211,17 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    # Get the base path for the PACE parquet files
-    dataset_base_path = get_data_dir()
-    # Input and output paths for training workflow
-    # "~/p-dsgt_clef2025-0/shared/plantclef/data"
-    # input_path = f"{dataset_base_path}/parquet_files/train"
-    # output_path = f"{dataset_base_path}/embeddings/train_embeddings"
-    input_path = f"{dataset_base_path}/parquet_files/subset_top20_train"
-    output_path = f"{dataset_base_path}/embeddings/subset_top20_embeddings"
-    model_path = setup_fine_tuned_model(use_only_classifier=False)
-    cpu_count = os.cpu_count()
-
     # parse args
     args = parse_args()
 
-    # update input and output params for embedding the test data
-    if args.process_test_data:
-        input_path = f"{dataset_base_path}/parquet_files/test"
-        output_path = f"{dataset_base_path}/data/embeddings/test_embeddings"
+    # Get the base path for the PACE parquet files
+    dataset_base_path = get_data_dir()
+
+    # Input and output paths for training workflow
+    # "~/p-dsgt_clef2025-0/shared/plantclef/data"
+    input_path = f"{dataset_base_path}/parquet_files/{args.input_dataset_name}"
+    output_path = f"{dataset_base_path}/embeddings/{args.input_dataset_name}_embeddings"
+    model_path = setup_fine_tuned_model(use_only_classifier=False)
 
     # run the workflow
     kwargs = {}
@@ -235,7 +239,7 @@ if __name__ == "__main__":
                 process_test_data=args.process_test_data,
                 use_grid=args.use_grid,
                 use_only_classifier=args.use_only_classifier,
-                cpu_count=cpu_count,
+                cpu_count=args.cpu_count,
                 batch_size=args.batch_size,
             )
         ],

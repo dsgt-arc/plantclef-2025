@@ -3,11 +3,11 @@
 #SBATCH --account=paceship-dsgt_clef2025        # Charge account
 #SBATCH --nodes=1                               # Number of nodes required
 #SBATCH --ntasks-per-node=1                     # Number of parallel tasks per node
-#SBATCH --cpus-per-task=4                       # Number of CPU cores per task
+#SBATCH --cpus-per-task=6                       # Number of CPU cores per task
 #SBATCH --mem-per-cpu=16G                       # Total memory per core for the job
 #SBATCH --time=8:00:00                          # Duration of the job (8 hours)
 #SBATCH --qos=inferno                           # QOS Name (inferno or embers)
-#SBATCH -oReport-%j.out                         # Combined output and error messages file
+#SBATCH -oReport-%j.log                         # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
 set -xe
@@ -18,19 +18,13 @@ echo "Hostname: $(hostname)"
 echo "Number of CPUs: $(nproc)"
 echo "Available memory: $(free -h)"
 
-# Directory setup
-SCRATCH_DIR=~/scratch/plantclef
-mkdir -p $SCRATCH_DIR
-cd $SCRATCH_DIR
-# Python environment setup
-python3 -m venv venv                          # Create virtual environment
-source venv/bin/activate                      # Activate the environment
-pip install --upgrade pip                     # Upgrade pip
-pip install -e ~/clef/plantclef-2025          # Installs package
+# Activate the environment
+source ~/clef/plantclef-2025/scripts/activate.sh
 
-# Load and activate Python module
-module load python/3.12.5                       # Load Python module
-source ~/scratch/plantclef/venv/bin/activate    # Activate the environment
+# Set environment variables
+export PYSPARK_DRIVER_MEMORY=20g
+export PYSPARK_EXECUTOR_MEMORY=20g
+export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Python script
-python ~/clef/plantclef-2025/plantclef/create_top_species_subset.py
+python ~/clef/plantclef-2025/plantclef/create_top_species_subset.py --top-n 10

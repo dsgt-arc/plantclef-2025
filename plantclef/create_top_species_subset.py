@@ -58,7 +58,7 @@ def parse_args():
     parser.add_argument(
         "--cores",
         type=int,
-        default=os.cpu_count(),
+        default=6,
         help="Number of cores used in Spark driver",
     )
     parser.add_argument(
@@ -105,6 +105,8 @@ def main():
     # write the DataFrame to PACE in Parquet format
     subset_df.write.mode("overwrite").parquet(output_path)
     print(f"Subset dataframe written to: {output_path}")
+    count = subset_df.count()
+    print(f"Number of rows in subset dataframe: {count}")
 
 
 if __name__ == "__main__":

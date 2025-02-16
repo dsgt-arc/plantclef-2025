@@ -28,6 +28,7 @@ export CPATH=$PYTHON_ROOT/include/python3.10:$CPATH         # Set CPATH
 SCRATCH_DIR=~/scratch/plantclef
 mkdir -p $SCRATCH_DIR
 cd $SCRATCH_DIR
+
 # Python environment setup
 python3 -m venv venv                          # Create virtual environment
 source venv/bin/activate                      # Activate the environment
