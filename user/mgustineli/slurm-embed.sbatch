@@ -41,7 +41,7 @@ export PYSPARK_EXECUTOR_MEMORY=20g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Python script
-python ~/clef/plantclef2025/plantclef/embedding/workflow.py \
+python ~/clef/plantclef-2025/plantclef/embedding/workflow.py \
     --input-dataset-name subset_top10_train \
     --cpu-count 6 \
     --batch-size 1 \
