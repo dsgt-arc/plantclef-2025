@@ -42,7 +42,7 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Python script
 python ~/clef/plantclef-2025/plantclef/embedding/workflow.py \
-    --input-dataset-name subset_top5_train \
+    --input-dataset-name crop_resize_128_subset_top5_train \
     --cpu-count 6 \
     --batch-size 1 \
 

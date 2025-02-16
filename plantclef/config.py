@@ -16,3 +16,8 @@ def get_model_dir() -> str:
     """
     home_dir = Path(os.path.expanduser("~"))
     return f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/models"
+
+
+def get_home_dir():
+    """Get the home directory for the current user on PACE."""
+    return Path(os.path.expanduser("~"))

@@ -1,18 +1,9 @@
-import os
 import argparse
-from pathlib import Path
 
 from pyspark.sql import functions as F
 
 from plantclef.spark import get_spark
-
-
-spark = get_spark()
-
-
-def get_home_dir():
-    """Get the home directory for the current user on PACE."""
-    return Path(os.path.expanduser("~"))
+from plantclef.config import get_home_dir
 
 
 def get_subset_dataframe(
