@@ -101,7 +101,7 @@ def parse_args():
     parser.add_argument(
         "--output-path",
         type=str,
-        default=f"{dataset_base_path}/parquet_files/train",
+        default=f"{dataset_base_path}/parquet/train",
         help="Path for output Parquet files",
     )
     parser.add_argument(

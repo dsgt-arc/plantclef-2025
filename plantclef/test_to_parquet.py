@@ -77,7 +77,7 @@ def parse_args():
     parser.add_argument(
         "--output-path",
         type=str,
-        default=f"{dataset_base_path}/parquet_files/test",
+        default=f"{dataset_base_path}/parquet/test",
         help="PACE path for output Parquet files",
     )
 

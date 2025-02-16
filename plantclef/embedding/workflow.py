@@ -166,12 +166,12 @@ def parse_args():
         "--input-dataset-name",
         type=str,
         default="subset_top10_train",
-        help="The number of CPUs to use for the Spark job",
+        help="Input dataset name in parquet format.",
     )
     parser.add_argument(
         "--cpu-count",
         type=int,
-        default=4,
+        default=6,
         help="The number of CPUs to use for the Spark job",
     )
     parser.add_argument(
@@ -219,7 +219,7 @@ if __name__ == "__main__":
 
     # Input and output paths for training workflow
     # "~/p-dsgt_clef2025-0/shared/plantclef/data"
-    input_path = f"{dataset_base_path}/parquet_files/{args.input_dataset_name}"
+    input_path = f"{dataset_base_path}/parquet/{args.input_dataset_name}"
     output_path = f"{dataset_base_path}/embeddings/{args.input_dataset_name}_embeddings"
     model_path = setup_fine_tuned_model(use_only_classifier=False)
 

@@ -91,7 +91,7 @@ def main():
 
     # set input and output paths
     home_dir = get_home_dir()
-    data_path = f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/data/parquet_files/"
+    data_path = f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/data/parquet/"
     input_path = f"{data_path}/train"
     output_path = f"{data_path}/subset_top{args.top_n}_train"
 
