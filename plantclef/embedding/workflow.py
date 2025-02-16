@@ -17,7 +17,7 @@ class ProcessDINOv2Pipeline(luigi.Task):
     output_path = luigi.Parameter()
     sql_statement = luigi.Parameter()
     model_path = luigi.Parameter(default=setup_fine_tuned_model())
-    batch_size = luigi.IntParameter(default=1)
+    batch_size = luigi.IntParameter(default=32)
 
     def output(self):
         return luigi.LocalTarget(f"{self.output_path}/metadata/_SUCCESS")
@@ -128,8 +128,8 @@ class Workflow(luigi.Task):
     process_test_data = luigi.OptionalBoolParameter(default=False)
     use_grid = luigi.OptionalBoolParameter(default=False)
     use_only_classifier = luigi.OptionalBoolParameter(default=False)
-    cpu_count = luigi.IntParameter(default=4)
-    batch_size = luigi.IntParameter(default=1)
+    cpu_count = luigi.IntParameter(default=6)
+    batch_size = luigi.IntParameter(default=32)
 
     def run(self):
         # training workflow parameters
@@ -177,7 +177,7 @@ def parse_args():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=1,
+        default=32,
         help="The batch size to use for embedding extraction",
     )
     parser.add_argument(

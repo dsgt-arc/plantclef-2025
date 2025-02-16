@@ -100,7 +100,7 @@ class WrappedFineTunedDINOv2(
         output_col: str = "output",
         model_path: str = setup_fine_tuned_model(),
         model_name: str = "vit_base_patch14_reg4_dinov2.lvd142m",
-        batch_size: int = 1,
+        batch_size: int = 32,
     ):
         super().__init__()
         self._setDefault(
