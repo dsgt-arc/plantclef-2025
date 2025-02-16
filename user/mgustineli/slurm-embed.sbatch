@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=plantclef-dinov2-embedding   # Job name
+#SBATCH --job-name=plantclef-embed              # Job name
 #SBATCH --account=paceship-dsgt_clef2025        # charge account
 #SBATCH --nodes=1                               # Number of nodes
 #SBATCH --ntasks-per-node=1                     # Number of tasks per node
