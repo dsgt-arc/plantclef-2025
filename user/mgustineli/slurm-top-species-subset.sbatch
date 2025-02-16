@@ -27,4 +27,4 @@ export PYSPARK_EXECUTOR_MEMORY=20g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Python script
-python ~/clef/plantclef-2025/plantclef/create_top_species_subset.py --top-n 10
+python ~/clef/plantclef-2025/plantclef/create_top_species_subset.py --top-n 5
