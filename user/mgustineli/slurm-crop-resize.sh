@@ -27,4 +27,4 @@ export PYSPARK_EXECUTOR_MEMORY=20g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Python script
-python ~/clef/plantclef-2025/plantclef/preprocessing/create_top_species_subset.py --top-n 5
+python ~/clef/plantclef-2025/plantclef/preprocessing/crop_resize_images.py --num-partitions 200

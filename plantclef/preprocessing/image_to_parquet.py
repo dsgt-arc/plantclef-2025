@@ -1,8 +1,3 @@
-"""
-Before running this script, make sure you have downloaded and extracted the test dataset into the data folder.
-Use the bash file `download_extract_dataset.sh` in the scripts folder.
-"""
-
 import os
 import argparse
 from pathlib import Path
@@ -11,15 +6,22 @@ from pyspark.sql import functions as F
 
 from plantclef.spark import get_spark
 
+"""
+Before running this script, make sure you have downloaded and extracted the dataset into the data folder.
+Use the bash file `download_extract_dataset.sh` in the scripts folder.
+"""
+
 
 def get_home_dir():
     """Get the home directory for the current user on PACE."""
     return Path(os.path.expanduser("~"))
 
 
-def create_spark_test_dataframe(spark, image_base_path: Path):
+def create_spark_dataframe(
+    spark, image_base_path: Path, metadata_path: str, metadata_filename: str
+):
+    """Converts images into binary data and joins with a Metadata DataFrame"""
     # Load all files from the base directory as binary data
-    # Convert Path object to string when passing to PySpark
     image_df = (
         spark.read.format("binaryFile")
         .option("pathGlobFilter", "*.jpg")
@@ -39,22 +41,38 @@ def create_spark_test_dataframe(spark, image_base_path: Path):
     split_path = F.split(image_df["path"], "/")
 
     # Select and rename columns to fit the target schema, including renaming 'content' to 'data'
-    image_final_df = image_df.select(
-        F.element_at(split_path, -1).alias("image_name"),
+    image_df = image_df.select(
         "path",
+        F.element_at(split_path, -1).alias("image_name"),
         F.col("content").alias("data"),
-    ).repartition(500)
+    )
 
-    return image_final_df
+    # Read the iNaturalist metadata CSV file
+    metadata_df = spark.read.csv(
+        f"{metadata_path}/{metadata_filename}.csv",
+        header=True,
+        inferSchema=True,
+        sep=";",  # specify semicolon as delimiter
+    )
+
+    # Drop duplicate entries based on 'image_path' before the join
+    metadata_df = metadata_df.dropDuplicates(["image_name"])
+
+    # Perform an inner join on the 'image_path' column
+    combined_df = image_df.join(metadata_df, "image_name", "inner").repartition(
+        500, "species_id"
+    )
+
+    return combined_df
 
 
 def parse_args():
-    """Parse command line arguments."""
+    """Parse command-line arguments."""
     home_dir = get_home_dir()
     dataset_base_path = f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/data"
 
     parser = argparse.ArgumentParser(
-        description="Process test image dataset stored on PACE."
+        description="Process images and metadata for a dataset stored on PACE."
     )
     parser.add_argument(
         "--cores",
@@ -71,14 +89,26 @@ def parse_args():
     parser.add_argument(
         "--image-root-path",
         type=str,
-        default=f"{dataset_base_path}/test/",
+        default=f"{dataset_base_path}/train/PlantCLEF2024",
         help="Base directory path for image data",
+    )
+    parser.add_argument(
+        "--metadata-path",
+        type=str,
+        default=f"{dataset_base_path}/metadata",
+        help="Root directory path for metadata",
     )
     parser.add_argument(
         "--output-path",
         type=str,
-        default=f"{dataset_base_path}/parquet_files/test",
-        help="PACE path for output Parquet files",
+        default=f"{dataset_base_path}/parquet/train",
+        help="Path for output Parquet files",
+    )
+    parser.add_argument(
+        "--metadata-filename",
+        type=str,
+        default="PlantCLEF2024singleplanttrainingdata",
+        help="Train Metadata CSV filename (without extension)",
     )
 
     return parser.parse_args()
@@ -91,14 +121,21 @@ def main():
     """
     args = parse_args()
 
-    # Initialize Spark
-    spark = get_spark(cores=args.cores, memory=args.memory)
+    # Initialize Spark with settings for using the big-disk-dev VM
+    spark = get_spark(
+        cores=args.cores, memory=args.memory, **{"spark.sql.shuffle.partitions": 500}
+    )
 
-    # Convert raw-root-path to a Path object here
+    # Convert root-path to a Path object here
     image_base_path = Path(args.image_root_path)
 
-    # Create test image dataframe
-    final_df = create_spark_test_dataframe(spark=spark, image_base_path=image_base_path)
+    # Create image dataframe
+    final_df = create_spark_dataframe(
+        spark=spark,
+        image_base_path=image_base_path,
+        metadata_path=args.metadata_path,
+        metadata_filename=args.metadata_filename,
+    )
 
     # Write the DataFrame to PACE in Parquet format
     final_df.write.mode("overwrite").parquet(args.output_path)

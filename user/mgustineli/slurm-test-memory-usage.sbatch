@@ -1,10 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=plantclef-dinov2-embedding   # Job name
+#SBATCH --job-name=plantclef-gpu-memory-test    # Job name
 #SBATCH --account=paceship-dsgt_clef2025        # charge account
-#SBATCH -N1 --gres=gpu:V100:1                   # Number of nodes and cores required
-#SBATCH --cpus-per-task=4                       # Number of cores per task
-#SBATCH --mem-per-gpu=32G                       # Memory per core
-#SBATCH --time=10:00:00                         # Duration of the job (8 hours)
+#SBATCH --nodes=1                               # Number of nodes
+#SBATCH --ntasks-per-node=1                     # Number of tasks per node
+#SBATCH --gres=gpu:1                            # GPU resource
+#SBATCH -C RTX6000                              # GPU type
+#SBATCH --cpus-per-task=1                       # Number of cores per task
+#SBATCH --mem-per-gpu=8G                       # Memory per core
+#SBATCH --time=2:00:00                          # Duration of the job (2 hours)
 #SBATCH --qos=inferno                           # QOS Name
 #SBATCH -oReport-%j.out                         # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
@@ -25,6 +28,7 @@ export CPATH=$PYTHON_ROOT/include/python3.10:$CPATH         # Set CPATH
 SCRATCH_DIR=~/scratch/plantclef
 mkdir -p $SCRATCH_DIR
 cd $SCRATCH_DIR
+
 # Python environment setup
 python3 -m venv venv                          # Create virtual environment
 source venv/bin/activate                      # Activate the environment
@@ -36,8 +40,8 @@ python -c "import torch; print(torch.cuda.is_available())"  # Check if PyTorch c
 nvidia-smi                                                  # Check GPU usage
 
 # Set environment variables
-export PYSPARK_DRIVER_MEMORY=16g
+export PYSPARK_DRIVER_MEMORY=6g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
-# Run Python script
-python ~/clef/plantclef-2025/plantclef/embedding/workflow.py
+# Run Pytest script
+pytest -vv -s ~/clef/plantclef-2025/tests/test_memory_usage.py

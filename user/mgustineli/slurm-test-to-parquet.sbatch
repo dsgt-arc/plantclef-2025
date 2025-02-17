@@ -23,4 +23,4 @@ module load python/3.12.5                       # Load Python module
 source ~/scratch/plantclef/venv/bin/activate    # Activate the environment
 
 # Run Python script
-python ~/clef/plantclef-2025/plantclef/test_to_parquet.py
+python ~/clef/plantclef-2025/plantclef/preprocessing/test_to_parquet.py

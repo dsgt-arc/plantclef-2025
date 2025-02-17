@@ -1,6 +1,5 @@
 from argparse import ArgumentParser
 
-import os
 import luigi
 from pyspark.ml import Pipeline, PipelineModel
 from pyspark.ml.feature import SQLTransformer
@@ -91,6 +90,7 @@ class ProcessEmbeddings(luigi.Task):
             "cores": self.cpu_count,
             "spark.sql.shuffle.partitions": self.num_partitions,
         }
+        print(f"Running task with kwargs: {kwargs}")
         with spark_resource(**kwargs) as spark:
             # read the data and keep the sample we're currently processing
             df = (
@@ -103,12 +103,9 @@ class ProcessEmbeddings(luigi.Task):
                 .drop("sample_id")
             )
 
-            # === CRUCIAL CHANGE ===
-            # To avoid out-of-memory errors on the GPU, coalesce the DataFrame to 1 partition
-            # This ensures that only one task runs the GPU inference at a time
             print("Initial number of partitions:", df.rdd.getNumPartitions())
             # Coalesce to 1 partition to force serialization of GPU tasks
-            df = df.coalesce(1)
+            # df = df.coalesce(8)
             print(
                 "Number of partitions after coalescing for GPU inference:",
                 df.rdd.getNumPartitions(),
@@ -131,8 +128,9 @@ class Workflow(luigi.Task):
     process_test_data = luigi.OptionalBoolParameter(default=False)
     use_grid = luigi.OptionalBoolParameter(default=False)
     use_only_classifier = luigi.OptionalBoolParameter(default=False)
-    cpu_count = luigi.IntParameter(default=4)
+    cpu_count = luigi.IntParameter(default=6)
     batch_size = luigi.IntParameter(default=32)
+    num_sample_id = luigi.IntParameter(default=20)
 
     def run(self):
         # training workflow parameters
@@ -153,12 +151,12 @@ class Workflow(luigi.Task):
                 sample_col=sample_col,
                 num_partitions=500,
                 sample_id=i,
-                num_sample_id=20,
+                num_sample_id=self.num_sample_id,
                 batch_size=self.batch_size,
                 cpu_count=self.cpu_count,
                 sql_statement=sql_statement,
             )
-            for i in range(20)
+            for i in range(self.num_sample_id)
         ]
 
 
@@ -166,10 +164,28 @@ def parse_args():
     """Parse command-line arguments."""
     parser = ArgumentParser(description="Luigi pipeline")
     parser.add_argument(
+        "--input-dataset-name",
+        type=str,
+        default="subset_top10_train",
+        help="Input dataset name in parquet format.",
+    )
+    parser.add_argument(
+        "--cpu-count",
+        type=int,
+        default=6,
+        help="The number of CPUs to use for the Spark job",
+    )
+    parser.add_argument(
         "--batch-size",
         type=int,
         default=32,
         help="The batch size to use for embedding extraction",
+    )
+    parser.add_argument(
+        "--num-sample-id",
+        type=int,
+        default=20,
+        help="The number of sample IDs to use for embedding extraction",
     )
     parser.add_argument(
         "--process-test-data",
@@ -202,24 +218,17 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    # Get the base path for the PACE parquet files
-    dataset_base_path = get_data_dir()
-    # Input and output paths for training workflow
-    # "~/p-dsgt_clef2025-0/shared/plantclef/data"
-    # input_path = f"{dataset_base_path}/parquet_files/train"
-    # output_path = f"{dataset_base_path}/embeddings/train_embeddings"
-    input_path = f"{dataset_base_path}/parquet_files/subset_top20_train"
-    output_path = f"{dataset_base_path}/embeddings/subset_top20_embeddings"
-    model_path = setup_fine_tuned_model(use_only_classifier=False)
-    cpu_count = os.cpu_count()
-
     # parse args
     args = parse_args()
 
-    # update input and output params for embedding the test data
-    if args.process_test_data:
-        input_path = f"{dataset_base_path}/parquet_files/test"
-        output_path = f"{dataset_base_path}/data/embeddings/test_embeddings"
+    # Get the base path for the PACE parquet files
+    dataset_base_path = get_data_dir()
+
+    # Input and output paths for training workflow
+    # "~/p-dsgt_clef2025-0/shared/plantclef/data"
+    input_path = f"{dataset_base_path}/parquet/{args.input_dataset_name}"
+    output_path = f"{dataset_base_path}/embeddings/{args.input_dataset_name}_embeddings"
+    model_path = setup_fine_tuned_model(use_only_classifier=False)
 
     # run the workflow
     kwargs = {}
@@ -237,8 +246,9 @@ if __name__ == "__main__":
                 process_test_data=args.process_test_data,
                 use_grid=args.use_grid,
                 use_only_classifier=args.use_only_classifier,
-                cpu_count=cpu_count,
+                cpu_count=args.cpu_count,
                 batch_size=args.batch_size,
+                num_sample_id=args.num_sample_id,
             )
         ],
         **kwargs,

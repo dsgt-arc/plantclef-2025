@@ -1,18 +1,9 @@
-import os
 import argparse
-from pathlib import Path
 
 from pyspark.sql import functions as F
 
 from plantclef.spark import get_spark
-
-
-spark = get_spark()
-
-
-def get_home_dir():
-    """Get the home directory for the current user on PACE."""
-    return Path(os.path.expanduser("~"))
+from plantclef.config import get_home_dir
 
 
 def get_subset_dataframe(
@@ -58,7 +49,7 @@ def parse_args():
     parser.add_argument(
         "--cores",
         type=int,
-        default=os.cpu_count(),
+        default=6,
         help="Number of cores used in Spark driver",
     )
     parser.add_argument(
@@ -91,7 +82,7 @@ def main():
 
     # set input and output paths
     home_dir = get_home_dir()
-    data_path = f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/data/parquet_files/"
+    data_path = f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/data/parquet/"
     input_path = f"{data_path}/train"
     output_path = f"{data_path}/subset_top{args.top_n}_train"
 
@@ -105,6 +96,8 @@ def main():
     # write the DataFrame to PACE in Parquet format
     subset_df.write.mode("overwrite").parquet(output_path)
     print(f"Subset dataframe written to: {output_path}")
+    count = subset_df.count()
+    print(f"Number of rows in subset dataframe: {count}")
 
 
 if __name__ == "__main__":

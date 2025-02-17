@@ -10,9 +10,12 @@ aria2
 torch
 timm
 transformers
+typer
+opencv-python
 
 # developer tools
 jupyterlab
 ruff
 pre-commit
 pytest
+xmltodict

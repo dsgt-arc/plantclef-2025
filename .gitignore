@@ -162,3 +162,7 @@ cython_debug/
 #.idea/
 
 *.out
+*.ndjson
+*.png
+*.csv
+logs/
