@@ -8,7 +8,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from plantclef.model_setup import setup_fine_tuned_model
-from plantclef.embedding.transform import WrappedFineTunedDINOv2
+from plantclef.embedding.embed import WrappedFineTunedDINOv2
 from plantclef.spark import spark_resource
 from plantclef.config import get_data_dir
 
@@ -48,7 +48,7 @@ class ProcessEmbeddings(luigi.Task):
     # of tasks that we have in parallel to best take advantage of disk
     num_partitions = luigi.OptionalIntParameter(default=500)
     sample_id = luigi.OptionalIntParameter(default=None)
-    num_sample_id = luigi.OptionalIntParameter(default=50)
+    num_sample_id = luigi.OptionalIntParameter(default=20)
     batch_size = luigi.IntParameter(default=32)
     cpu_count = luigi.IntParameter(default=4)
     sql_statement = luigi.Parameter(
@@ -105,7 +105,7 @@ class ProcessEmbeddings(luigi.Task):
 
             print("Initial number of partitions:", df.rdd.getNumPartitions())
             # Coalesce to 1 partition to force serialization of GPU tasks
-            # df = df.coalesce(1)
+            # df = df.coalesce(8)
             print(
                 "Number of partitions after coalescing for GPU inference:",
                 df.rdd.getNumPartitions(),
@@ -130,6 +130,7 @@ class Workflow(luigi.Task):
     use_only_classifier = luigi.OptionalBoolParameter(default=False)
     cpu_count = luigi.IntParameter(default=6)
     batch_size = luigi.IntParameter(default=32)
+    num_sample_id = luigi.IntParameter(default=20)
 
     def run(self):
         # training workflow parameters
@@ -150,12 +151,12 @@ class Workflow(luigi.Task):
                 sample_col=sample_col,
                 num_partitions=500,
                 sample_id=i,
-                num_sample_id=20,
+                num_sample_id=self.num_sample_id,
                 batch_size=self.batch_size,
                 cpu_count=self.cpu_count,
                 sql_statement=sql_statement,
             )
-            for i in range(20)
+            for i in range(self.num_sample_id)
         ]
 
 
@@ -179,6 +180,12 @@ def parse_args():
         type=int,
         default=32,
         help="The batch size to use for embedding extraction",
+    )
+    parser.add_argument(
+        "--num-sample-id",
+        type=int,
+        default=20,
+        help="The number of sample IDs to use for embedding extraction",
     )
     parser.add_argument(
         "--process-test-data",
@@ -241,6 +248,7 @@ if __name__ == "__main__":
                 use_only_classifier=args.use_only_classifier,
                 cpu_count=args.cpu_count,
                 batch_size=args.batch_size,
+                num_sample_id=args.num_sample_id,
             )
         ],
         **kwargs,
