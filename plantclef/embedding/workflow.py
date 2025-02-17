@@ -8,7 +8,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from plantclef.model_setup import setup_fine_tuned_model
-from plantclef.embedding.embed import WrappedFineTunedDINOv2
+from plantclef.embedding.transform import WrappedFineTunedDINOv2
 from plantclef.spark import spark_resource
 from plantclef.config import get_data_dir
 

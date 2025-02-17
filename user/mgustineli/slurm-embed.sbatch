@@ -40,16 +40,16 @@ nvidia_logs_pid=$!
 echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
 
 # Set environment variables
-export PYSPARK_DRIVER_MEMORY=40g
-export PYSPARK_EXECUTOR_MEMORY=40g
+export PYSPARK_DRIVER_MEMORY=20g
+export PYSPARK_EXECUTOR_MEMORY=20g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Run Python script
 python ~/clef/plantclef-2025/plantclef/embedding/workflow.py \
     --input-dataset-name subset_top5_train \
     --cpu-count 6 \
-    --batch-size 128 \
-    --num-sample-id 20 \
+    --batch-size 32 \
+    --num-sample-id 10 \
 
 # Get the GPU utilization plots
 python ~/clef/plantclef-2025/scripts/nvidia-logs.sh parse Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
