@@ -25,7 +25,7 @@ def xml2json(xml):
     return json.dumps(xmltodict.parse(xml))
 
 @app.command()
-def monitor(output: str, interval: int = 30, verbose: bool = False):
+def monitor(output: str, interval: int = 10, verbose: bool = False):
     """Monitors nvidia-smi and logs to disk."""
     # Determine and print the absolute path where the log file will be written
     abs_output = os.path.abspath(output)

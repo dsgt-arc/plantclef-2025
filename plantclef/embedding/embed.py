@@ -1,19 +1,17 @@
+from argparse import ArgumentParser
+
 import io
-import pandas as pd
 import timm
-import torch
 import logging
 from PIL import Image
+import pandas as pd
+import torch
 from torch.utils.data import Dataset, DataLoader
-
 from pyspark.sql.functions import pandas_udf
 from pyspark.sql.types import ArrayType, FloatType
-from pyspark.ml import Transformer
-from pyspark.ml.param import Param, Params, TypeConverters
-from pyspark.ml.param.shared import HasInputCol, HasOutputCol
-from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
-from pyspark.sql import DataFrame
 
+from plantclef.spark import spark_resource
+from plantclef.config import get_data_dir
 from plantclef.model_setup import setup_fine_tuned_model
 
 # ------------------------------------------------------------------------------
@@ -51,7 +49,6 @@ def load_and_broadcast_model(spark):
         state = model.cpu().state_dict()
         MODEL_STATE_BROADCAST = spark.sparkContext.broadcast(state)
         logger.info("Model state_dict broadcasted to executors.")
-    return MODEL_STATE_BROADCAST
 
 
 def get_image_transform():
@@ -117,9 +114,9 @@ def predict_batch_udf(image_series: pd.Series) -> pd.Series:
     transform = get_image_transform()
 
     # Create our PyTorch dataset and DataLoader.
-    dataset = ImageDataset(image_series, transform)
+    dataset = ImageDataset(image_series, transform=transform)
     # Using num_workers=0 inside the UDF to avoid multi-threading issues.
-    dataloader = DataLoader(dataset, batch_size=128, num_workers=0)
+    dataloader = DataLoader(dataset, batch_size=128, num_workers=6)
 
     embeddings = []
     with torch.no_grad():
@@ -134,121 +131,82 @@ def predict_batch_udf(image_series: pd.Series) -> pd.Series:
 
 
 # ------------------------------------------------------------------------------
-# Parameter Mixins for Model Settings
+# Parse command-line arguments
 # ------------------------------------------------------------------------------
 
 
-class HasModelPath(Param):
-    """
-    Mixin for param model_path: str
-    """
-
-    modelPath = Param(
-        Params._dummy(),
-        "modelPath",
-        "The path to the fine-tuned DINOv2 model",
-        typeConverter=TypeConverters.toString,
+def parse_args():
+    """Parse command-line arguments."""
+    parser = ArgumentParser(description="Luigi pipeline")
+    parser.add_argument(
+        "--input-dataset-name",
+        type=str,
+        default="subset_top10_train",
+        help="Input dataset name in parquet format.",
     )
-
-    def __init__(self):
-        super().__init__(
-            default=setup_fine_tuned_model(),
-            doc="The path to the fine-tuned DINOv2 model",
-        )
-
-    def getModelPath(self) -> str:
-        return self.getOrDefault(self.modelPath)
-
-
-class HasModelName(Param):
-    """
-    Mixin for param model_name: str
-    """
-
-    modelName = Param(
-        Params._dummy(),
-        "modelName",
-        "The name of the DINOv2 model to use",
-        typeConverter=TypeConverters.toString,
+    parser.add_argument(
+        "--cpu-count",
+        type=int,
+        default=6,
+        help="The number of CPUs to use for the Spark job",
     )
-
-    def __init__(self):
-        super().__init__(
-            default=MODEL_NAME,
-            doc="The name of the DINOv2 model to use",
-        )
-
-    def getModelName(self) -> str:
-        return self.getOrDefault(self.modelName)
-
-
-class HasBatchSize(Param):
-    """
-    Mixin for param batch_size: int
-    """
-
-    batchSize = Param(
-        Params._dummy(),
-        "batchSize",
-        "The batch size to use for embedding extraction",
-        typeConverter=TypeConverters.toInt,
+    parser.add_argument(
+        "--num-partitions",
+        type=int,
+        default=10,
+        help="Number of partitions for the output DataFrame",
     )
-
-    def __init__(self):
-        super().__init__(
-            default=128,
-            doc="The batch size to use for embedding extraction",
-        )
-
-    def getBatchSize(self) -> int:
-        return self.getOrDefault(self.batchSize)
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=32,
+        help="The batch size to use for embedding extraction",
+    )
+    parser.add_argument(
+        "--num-sample-id",
+        type=int,
+        default=20,
+        help="The number of sample IDs to use for embedding extraction",
+    )
+    return parser.parse_args()
 
 
 # ------------------------------------------------------------------------------
-# WrappedFineTunedDINOv2 Transformer
+# Main workflow
 # ------------------------------------------------------------------------------
 
 
-class WrappedFineTunedDINOv2(
-    Transformer,
-    HasInputCol,
-    HasOutputCol,
-    HasModelPath,
-    HasModelName,
-    HasBatchSize,
-    DefaultParamsReadable,
-    DefaultParamsWritable,
-):
-    """
-    A Spark ML Transformer that extracts embeddings from images using a
-    fine-tuned DINOv2 model. The model is loaded on the driver and its state is
-    broadcast to workers. Inference is performed via a Pandas UDF that uses a
-    PyTorch Dataset for efficient batched processing.
-    """
+def main():
+    # parse args
+    args = parse_args()
 
-    def __init__(
-        self,
-        input_col: str = "input",
-        output_col: str = "cls_embedding",
-        model_path: str = setup_fine_tuned_model(),
-        model_name: str = MODEL_NAME,
-        batch_size: int = 128,
-    ):
-        super().__init__()
-        self._setDefault(
-            inputCol=input_col,
-            outputCol=output_col,
-            modelPath=model_path,
-            modelName=model_name,
-            batchSize=batch_size,
-        )
-        self.num_classes = NUM_CLASSES
-        self.device = DEVICE  # Set the device for this transformer.
+    # Get the base path for the PACE parquet files
+    dataset_base_path = get_data_dir()
 
-    def _transform(self, df: DataFrame) -> DataFrame:
-        # Ensure the model is loaded on the driver and its state is broadcast.
-        load_and_broadcast_model(df.sql_ctx.sparkSession)
-        # Apply the Pandas UDF to the designated input column.
-        return df.withColumn(
-            self.getOutputCol(), predict_batch_udf(df[self.getInputCol()])
-        )
+    # Input and output paths for training workflow
+    # "~/p-dsgt_clef2025-0/shared/plantclef/data"
+    input_path = f"{dataset_base_path}/parquet/{args.input_dataset_name}"
+    output_path = f"{dataset_base_path}/embeddings/{args.input_dataset_name}_embeddings"
+
+    # Initialize Spark with settings for using the big-disk-dev VM
+    kwargs = {
+        "cores": args.cpu_count,
+        "spark.sql.shuffle.partitions": args.num_partitions,
+        "spark.sql.execution.arrow.pyspark.enabled": "true",
+        "spark.sql.execution.arrow.maxRecordsPerBatch": "64",
+    }
+    print(f"Running task with kwargs: {kwargs}")
+    with spark_resource(**kwargs) as spark:
+        # Load the input data
+        # number of partitions should be a small multiple of total number of nodes
+        df = spark.read.parquet(input_path).repartition(args.num_partitions)
+
+        # Load the model and broadcast it to the executors
+        load_and_broadcast_model(spark)
+
+        embeddings_df = df.withColumn("cls_embeddings", predict_batch_udf(df["data"]))
+        embeddings_df.write.mode("overwrite").parquet(output_path)
+
+
+if __name__ == "__main__":
+    main()

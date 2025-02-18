@@ -3,9 +3,9 @@
 #SBATCH --account=paceship-dsgt_clef2025        # charge account
 #SBATCH --nodes=1                               # Number of nodes
 #SBATCH --ntasks-per-node=1                     # Number of tasks per node
-##SBATCH --gres=gpu:V100:1                      # Number of GPUs per node
-#SBATCH --gres=gpu:1                            # Number of GPUs per node
-#SBATCH -C RTX6000                              # GPU type
+#SBATCH --gres=gpu:V100:1                      # Number of GPUs per node
+##SBATCH --gres=gpu:1                            # Number of GPUs per node
+##SBATCH -C RTX6000                              # GPU type
 #SBATCH --cpus-per-task=6                       # Number of cores per task
 #SBATCH --mem=64G                               # Memory per core
 #SBATCH --time=10:00:00                         # Duration of the job (8 hours)
@@ -48,8 +48,8 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 python ~/clef/plantclef-2025/plantclef/embedding/workflow.py \
     --input-dataset-name subset_top5_train \
     --cpu-count 6 \
-    --batch-size 32 \
-    --num-sample-id 10 \
+    --batch-size 1 \
+    --num-sample-id 5 \
 
 # Get the GPU utilization plots
 python ~/clef/plantclef-2025/scripts/nvidia-logs.sh parse Report-${SLURM_JOB_ID}-nvidia-logs.ndjson

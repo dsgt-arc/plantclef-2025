@@ -1,15 +1,38 @@
 import os
-from plantclef.config import get_model_dir
+from pathlib import Path
 
 
-def setup_fine_tuned_model(use_only_classifier: bool = False):
+def get_model_dir() -> str:
+    """
+    Get the model directory in the plantclef shared project for the current user on PACE
+    """
+    home_dir = Path(os.path.expanduser("~"))
+    return f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/models"
+
+
+def get_scratch_model_dir() -> str:
+    """
+    Get the model directory in the plantclef shared project for the current user on PACE
+    """
+    home_dir = Path(os.path.expanduser("~"))
+    return f"{home_dir}/scratch/plantclef/models"
+
+
+def setup_fine_tuned_model(
+    scratch_model: bool = True,
+    use_only_classifier: bool = False,
+):
     """
     Downloads and unzips a model from PACE and returns the path to the specified model file.
     Checks if the model already exists and skips download and extraction if it does.
 
     :return: Absolute path to the model file.
     """
-    model_base_path = get_model_dir()  # get directory for model
+    # get directory for model
+    if scratch_model:
+        model_base_path = get_scratch_model_dir()
+    else:
+        model_base_path = get_model_dir()
     tar_filename = "model_best.pth.tar"
     pretrained_model = (
         "vit_base_patch14_reg4_dinov2_lvd142m_pc24_onlyclassifier_then_all"

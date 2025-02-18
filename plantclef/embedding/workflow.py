@@ -1,6 +1,6 @@
-from argparse import ArgumentParser
-
 import luigi
+import typer
+from typing_extensions import Annotated
 from pyspark.ml import Pipeline, PipelineModel
 from pyspark.ml.feature import SQLTransformer
 from pyspark.ml.functions import vector_to_array
@@ -10,13 +10,13 @@ from pyspark.sql import functions as F
 from plantclef.model_setup import setup_fine_tuned_model
 from plantclef.embedding.transform import WrappedFineTunedDINOv2
 from plantclef.spark import spark_resource
-from plantclef.config import get_data_dir
 
 
 class ProcessDINOv2Pipeline(luigi.Task):
     output_path = luigi.Parameter()
     sql_statement = luigi.Parameter()
-    model_path = luigi.Parameter(default=setup_fine_tuned_model())
+    model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
+    model_name = luigi.Parameter("vit_base_patch14_reg4_dinov2.lvd142m")
     batch_size = luigi.IntParameter(default=32)
 
     def output(self):
@@ -27,6 +27,7 @@ class ProcessDINOv2Pipeline(luigi.Task):
             input_col="data",
             output_col="cls_embedding",
             model_path=self.model_path,
+            model_name=self.model_name,
             batch_size=self.batch_size,
         )
         return Pipeline(
@@ -42,15 +43,16 @@ class ProcessDINOv2Pipeline(luigi.Task):
 class ProcessEmbeddings(luigi.Task):
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
-    model_path = luigi.Parameter(default=setup_fine_tuned_model())
-    sample_col = luigi.Parameter(default="species_id")
+    sample_col = luigi.Parameter(default="image_name")
+    sample_id = luigi.OptionalIntParameter(default=None)
     # controls the number of partitions written to disk, must be at least the number
     # of tasks that we have in parallel to best take advantage of disk
-    num_partitions = luigi.OptionalIntParameter(default=500)
-    sample_id = luigi.OptionalIntParameter(default=None)
-    num_sample_id = luigi.OptionalIntParameter(default=20)
-    batch_size = luigi.IntParameter(default=32)
+    num_sample_ids = luigi.OptionalIntParameter(default=20)
+    num_partitions = luigi.OptionalIntParameter(default=20)
     cpu_count = luigi.IntParameter(default=4)
+    batch_size = luigi.IntParameter(default=32)
+    model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
+    model_name = luigi.Parameter("vit_base_patch14_reg4_dinov2.lvd142m")
     sql_statement = luigi.Parameter(
         default="SELECT image_name, species_id, cls_embedding FROM __THIS__"
     )
@@ -67,6 +69,7 @@ class ProcessEmbeddings(luigi.Task):
                 output_path=f"{self.output_path}/model",
                 sql_statement=self.sql_statement,
                 model_path=self.model_path,
+                model_name=self.model_name,
                 batch_size=self.batch_size,
             )
         ]
@@ -88,7 +91,7 @@ class ProcessEmbeddings(luigi.Task):
     def run(self):
         kwargs = {
             "cores": self.cpu_count,
-            "spark.sql.shuffle.partitions": self.num_partitions,
+            # "spark.sql.shuffle.partitions": self.num_partitions,
         }
         print(f"Running task with kwargs: {kwargs}")
         with spark_resource(**kwargs) as spark:
@@ -97,7 +100,8 @@ class ProcessEmbeddings(luigi.Task):
                 spark.read.parquet(self.input_path)
                 .withColumn(
                     "sample_id",
-                    F.crc32(F.col(self.sample_col).cast("string")) % self.num_sample_id,
+                    F.crc32(F.col(self.sample_col).cast("string"))
+                    % self.num_sample_ids,
                 )
                 .where(F.col("sample_id") == self.sample_id)
                 .drop("sample_id")
@@ -124,116 +128,57 @@ class ProcessEmbeddings(luigi.Task):
 class Workflow(luigi.Task):
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
-    model_path = luigi.Parameter(default=setup_fine_tuned_model())
-    process_test_data = luigi.OptionalBoolParameter(default=False)
-    use_grid = luigi.OptionalBoolParameter(default=False)
-    use_only_classifier = luigi.OptionalBoolParameter(default=False)
+    sample_id = luigi.OptionalParameter()
+    num_sample_ids = luigi.IntParameter(default=20)
     cpu_count = luigi.IntParameter(default=6)
     batch_size = luigi.IntParameter(default=32)
-    num_sample_id = luigi.IntParameter(default=20)
+    num_partitions = luigi.IntParameter(default=20)
+    model_path = luigi.Parameter(setup_fine_tuned_model(scratch_model=True))
+    model_name = luigi.Parameter("vit_base_patch14_reg4_dinov2.lvd142m")
 
-    def run(self):
-        # training workflow parameters
-        sample_col = "species_id"
-        sql_statement = "SELECT image_name, species_id, cls_embedding FROM __THIS__"
-        input_path = self.input_path
-        output_path = self.output_path
+    def requires(self):
+        # either we run a single task or we run all the tasks
+        if self.sample_id is not None:
+            sample_ids = [self.sample_id]
+        else:
+            sample_ids = list(range(self.num_tasks))
 
-        # print parameters for sanity check
-        print(f"\ninput_path: {input_path}")
-        print(f"output_path: {output_path}")
-        print(f"sample_col: {sample_col}\n")
-        yield [
-            ProcessEmbeddings(
-                input_path=input_path,
-                output_path=output_path,
-                model_path=self.model_path,
-                sample_col=sample_col,
-                num_partitions=500,
-                sample_id=i,
-                num_sample_id=self.num_sample_id,
-                batch_size=self.batch_size,
+        tasks = []
+        for sample_id in sample_ids:
+            task = ProcessEmbeddings(
+                input_path=self.input_path,
+                output_path=self.output_path,
+                sample_id=sample_id,
+                num_sample_ids=self.num_sample_ids,
+                num_partitions=self.num_partitions,
                 cpu_count=self.cpu_count,
-                sql_statement=sql_statement,
+                batch_size=self.batch_size,
+                model_path=self.model_path,
+                model_name=self.model_name,
             )
-            for i in range(self.num_sample_id)
-        ]
+            tasks.append(task)
+        yield tasks
 
 
-def parse_args():
-    """Parse command-line arguments."""
-    parser = ArgumentParser(description="Luigi pipeline")
-    parser.add_argument(
-        "--input-dataset-name",
-        type=str,
-        default="subset_top10_train",
-        help="Input dataset name in parquet format.",
-    )
-    parser.add_argument(
-        "--cpu-count",
-        type=int,
-        default=6,
-        help="The number of CPUs to use for the Spark job",
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=32,
-        help="The batch size to use for embedding extraction",
-    )
-    parser.add_argument(
-        "--num-sample-id",
-        type=int,
-        default=20,
-        help="The number of sample IDs to use for embedding extraction",
-    )
-    parser.add_argument(
-        "--process-test-data",
-        type=bool,
-        default=False,
-        help="If True, set workflow to process the test data and extract embeddings",
-    )
-    parser.add_argument(
-        "--use-grid",
-        type=bool,
-        default=False,
-        help="If True, create a grid when using the pretrained ViT model to make predictions",
-    )
-    parser.add_argument(
-        "--use-only-classifier",
-        type=bool,
-        default=False,
-        help="""
-        If True, use the pretrained ViT with frozen backbone, one classification head has been finetuned
-        Otherwise, use the only-classifier-then-all pretrained model
-        """,
-    )
-    parser.add_argument(
-        "--scheduler-host",
-        type=None,
-        default=None,
-        help="""Scheduler host for the Luigi workflow""",
-    )
-    return parser.parse_args()
-
-
-if __name__ == "__main__":
-    # parse args
-    args = parse_args()
-
-    # Get the base path for the PACE parquet files
-    dataset_base_path = get_data_dir()
-
-    # Input and output paths for training workflow
-    # "~/p-dsgt_clef2025-0/shared/plantclef/data"
-    input_path = f"{dataset_base_path}/parquet/{args.input_dataset_name}"
-    output_path = f"{dataset_base_path}/embeddings/{args.input_dataset_name}_embeddings"
-    model_path = setup_fine_tuned_model(use_only_classifier=False)
-
+def main(
+    input_path: Annotated[str, typer.Argument(help="Input root directory")],
+    output_path: Annotated[str, typer.Argument(help="Output root directory")],
+    sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
+    num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 50,
+    cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 8,
+    batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
+    scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
+    model_path: Annotated[
+        str, typer.Option(help="Model path")
+    ] = setup_fine_tuned_model(scratch_model=True),
+    model_name: Annotated[
+        str, typer.Option(help="Model name")
+    ] = "vit_base_patch14_reg4_dinov2.lvd142m",
+):
     # run the workflow
     kwargs = {}
-    if args.scheduler_host:
-        kwargs["scheduler_host"] = args.scheduler_host
+    if scheduler_host:
+        kwargs["scheduler_host"] = scheduler_host
     else:
         kwargs["local_scheduler"] = True
 
@@ -242,13 +187,12 @@ if __name__ == "__main__":
             Workflow(
                 input_path=input_path,
                 output_path=output_path,
+                sample_id=sample_id,
+                num_sample_ids=num_sample_ids,
+                cpu_count=cpu_count,
+                batch_size=batch_size,
                 model_path=model_path,
-                process_test_data=args.process_test_data,
-                use_grid=args.use_grid,
-                use_only_classifier=args.use_only_classifier,
-                cpu_count=args.cpu_count,
-                batch_size=args.batch_size,
-                num_sample_id=args.num_sample_id,
+                model_name=model_name,
             )
         ],
         **kwargs,
