@@ -13,6 +13,8 @@ from plantclef.spark import spark_resource
 
 
 class ProcessDINOv2Pipeline(luigi.Task):
+    """Task to process embeddings using a DINOv2 model."""
+
     output_path = luigi.Parameter()
     sql_statement = luigi.Parameter()
     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
@@ -41,6 +43,8 @@ class ProcessDINOv2Pipeline(luigi.Task):
 
 
 class ProcessEmbeddings(luigi.Task):
+    """Task to process embeddings."""
+
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
     sample_col = luigi.Parameter(default="image_name")
@@ -120,12 +124,18 @@ class ProcessEmbeddings(luigi.Task):
             # transform the dataframe and write to disk
             transformed = self.transform(model, df, self.feature_columns)
 
-            transformed.repartition(self.num_partitions).write.mode(
-                "overwrite"
-            ).parquet(f"{self.output_path}/data/sample_id={self.sample_id}")
+            transformed.printSchema()
+            transformed.explain()
+            (
+                transformed.repartition(self.num_partitions)
+                .write.mode("overwrite")
+                .parquet(f"{self.output_path}/data/sample_id={self.sample_id}")
+            )
 
 
-class Workflow(luigi.Task):
+class Workflow(luigi.WrapperTask):
+    """Workflow with two tasks."""
+
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
     sample_id = luigi.OptionalParameter()
@@ -145,6 +155,7 @@ class Workflow(luigi.Task):
 
         tasks = []
         for sample_id in sample_ids:
+            print(f"Creating task for sample_id: {sample_id}")
             task = ProcessEmbeddings(
                 input_path=self.input_path,
                 output_path=self.output_path,
@@ -182,6 +193,7 @@ def main(
     else:
         kwargs["local_scheduler"] = True
 
+    print("Running workflow")
     luigi.build(
         [
             Workflow(
