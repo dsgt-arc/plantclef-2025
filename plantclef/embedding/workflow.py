@@ -18,7 +18,7 @@ class ProcessDINOv2Pipeline(luigi.Task):
     output_path = luigi.Parameter()
     sql_statement = luigi.Parameter()
     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
-    model_name = luigi.Parameter("vit_base_patch14_reg4_dinov2.lvd142m")
+    model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
     batch_size = luigi.IntParameter(default=32)
 
     def output(self):
@@ -55,8 +55,6 @@ class ProcessEmbeddings(luigi.Task):
     num_partitions = luigi.OptionalIntParameter(default=20)
     cpu_count = luigi.IntParameter(default=4)
     batch_size = luigi.IntParameter(default=32)
-    model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
-    model_name = luigi.Parameter("vit_base_patch14_reg4_dinov2.lvd142m")
     sql_statement = luigi.Parameter(
         default="SELECT image_name, species_id, cls_embedding FROM __THIS__"
     )
@@ -72,8 +70,6 @@ class ProcessEmbeddings(luigi.Task):
             ProcessDINOv2Pipeline(
                 output_path=f"{self.output_path}/model",
                 sql_statement=self.sql_statement,
-                model_path=self.model_path,
-                model_name=self.model_name,
                 batch_size=self.batch_size,
             )
         ]
@@ -95,7 +91,6 @@ class ProcessEmbeddings(luigi.Task):
     def run(self):
         kwargs = {
             "cores": self.cpu_count,
-            # "spark.sql.shuffle.partitions": self.num_partitions,
         }
         print(f"Running task with kwargs: {kwargs}")
         with spark_resource(**kwargs) as spark:
@@ -143,8 +138,6 @@ class Workflow(luigi.WrapperTask):
     cpu_count = luigi.IntParameter(default=6)
     batch_size = luigi.IntParameter(default=32)
     num_partitions = luigi.IntParameter(default=20)
-    model_path = luigi.Parameter(setup_fine_tuned_model(scratch_model=True))
-    model_name = luigi.Parameter("vit_base_patch14_reg4_dinov2.lvd142m")
 
     def requires(self):
         # either we run a single task or we run all the tasks
@@ -164,8 +157,6 @@ class Workflow(luigi.WrapperTask):
                 num_partitions=self.num_partitions,
                 cpu_count=self.cpu_count,
                 batch_size=self.batch_size,
-                model_path=self.model_path,
-                model_name=self.model_name,
             )
             tasks.append(task)
         yield tasks
@@ -174,18 +165,17 @@ class Workflow(luigi.WrapperTask):
 def main(
     input_path: Annotated[str, typer.Argument(help="Input root directory")],
     output_path: Annotated[str, typer.Argument(help="Output root directory")],
-    sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
-    num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 50,
     cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 8,
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
+    sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
+    num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
-    model_path: Annotated[
-        str, typer.Option(help="Model path")
-    ] = setup_fine_tuned_model(scratch_model=True),
-    model_name: Annotated[
-        str, typer.Option(help="Model name")
-    ] = "vit_base_patch14_reg4_dinov2.lvd142m",
 ):
+    print("Starting workflow execution...")
+    print(f"Input path: {input_path}")
+    print(f"Output path: {output_path}")
+    print(f"CPU Count: {cpu_count}, Batch Size: {batch_size}, Sample ID: {sample_id}")
+
     # run the workflow
     kwargs = {}
     if scheduler_host:
@@ -193,19 +183,20 @@ def main(
     else:
         kwargs["local_scheduler"] = True
 
-    print("Running workflow")
+    print("Calling luigi.build() with parameters...")
+
     luigi.build(
         [
             Workflow(
                 input_path=input_path,
                 output_path=output_path,
-                sample_id=sample_id,
-                num_sample_ids=num_sample_ids,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
-                model_path=model_path,
-                model_name=model_name,
+                sample_id=sample_id,
+                num_sample_ids=num_sample_ids,
             )
         ],
         **kwargs,
     )
+
+    print("Workflow execution completed")

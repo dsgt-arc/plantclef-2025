@@ -33,11 +33,11 @@ source ~/clef/plantclef-2025/scripts/activate.sh
 python -c "import torch; print(torch.cuda.is_available())"  # Check if PyTorch can access the GPU
 nvidia-smi                                                  # Check GPU usage
 
-# start the nvidia monitoring job in the background using SLURM job id
-NVIDIA_LOG_FILE=Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
-python ~/clef/plantclef-2025/scripts/nvidia-logs.sh monitor "$NVIDIA_LOG_FILE" --interval 10 &
-nvidia_logs_pid=$!
-echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
+# # start the nvidia monitoring job in the background using SLURM job id
+# NVIDIA_LOG_FILE=Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
+# python ~/clef/plantclef-2025/scripts/nvidia-logs.sh monitor "$NVIDIA_LOG_FILE" --interval 10 &
+# nvidia_logs_pid=$!
+# echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
 
 # # start the nvidia monitoring job in the background using slurm job id
 # NVIDIA_LOG_FILE=Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
