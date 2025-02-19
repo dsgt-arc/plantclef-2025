@@ -14,7 +14,7 @@
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
 
 # for parallel runs, break into 10 jobs 10 at a time e.g.
-#SBATCH --array=0-1%1
+##SBATCH --array=0-1%0
 
 set -xe
 export NO_REINSTALL=1
@@ -32,12 +32,6 @@ source ~/clef/plantclef-2025/scripts/activate.sh
 python -c "import torch; print(torch.cuda.is_available())"  # Check if PyTorch can access the GPU
 nvidia-smi                                                  # Check GPU usage
 
-# start the nvidia monitoring job in the background using SLURM job id
-NVIDIA_LOG_FILE=Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
-python ~/clef/plantclef-2025/scripts/nvidia-logs.sh monitor "$NVIDIA_LOG_FILE" --interval 10 &
-nvidia_logs_pid=$!
-echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
-
 # set environment variables
 export PYSPARK_DRIVER_MEMORY=10g
 export PYSPARK_EXECUTOR_MEMORY=10g
@@ -46,16 +40,10 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 # define paths
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef
-dataset_name=subset_top5_train
+dataset_name=crop_resize_128_subset_top5_train
 
-# run Python script
-plantclef embedding workflow \
+# run workflow
+plantclef embedding test_workflow \
     $scratch_data_dir/parquet/$dataset_name \
-    $scratch_data_dir/embeddings/${SLURM_JOB_ID}_$dataset_name \
-    --cpu-count 6 \
-    --batch-size 1 \
-    --num-sample-ids 1 \
-    --sample-id $SLURM_ARRAY_TASK_ID
-
-# parse the nvida monitoring output
-python ~/clef/plantclef-2025/scripts/nvidia-logs.sh parse Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
+    $scratch_data_dir/embeddings/${SLURM_JOB_ID}/$dataset_name \
+    --sample-id 0

@@ -1,5 +1,5 @@
 from typer import Typer
-from .etl import app as etl_app
+from plantclef.embedding import app as embedding_app
 
 app = Typer()
-app.add_typer(etl_app, name="etl")
+app.add_typer(embedding_app, name="embedding")

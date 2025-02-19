@@ -92,7 +92,6 @@ class ProcessEmbeddings(luigi.Task):
         kwargs = {
             "cores": self.cpu_count,
         }
-        print(f"Running task with kwargs: {kwargs}")
         with spark_resource(**kwargs) as spark:
             # read the data and keep the sample we're currently processing
             df = (
@@ -148,7 +147,6 @@ class Workflow(luigi.WrapperTask):
 
         tasks = []
         for sample_id in sample_ids:
-            print(f"Creating task for sample_id: {sample_id}")
             task = ProcessEmbeddings(
                 input_path=self.input_path,
                 output_path=self.output_path,
@@ -171,19 +169,12 @@ def main(
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
-    print("Starting workflow execution...")
-    print(f"Input path: {input_path}")
-    print(f"Output path: {output_path}")
-    print(f"CPU Count: {cpu_count}, Batch Size: {batch_size}, Sample ID: {sample_id}")
-
     # run the workflow
     kwargs = {}
     if scheduler_host:
         kwargs["scheduler_host"] = scheduler_host
     else:
         kwargs["local_scheduler"] = True
-
-    print("Calling luigi.build() with parameters...")
 
     luigi.build(
         [
@@ -198,5 +189,3 @@ def main(
         ],
         **kwargs,
     )
-
-    print("Workflow execution completed")
