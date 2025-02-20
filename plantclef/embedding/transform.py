@@ -141,21 +141,20 @@ class WrappedFineTunedDINOv2(
     def _make_predict_fn(self):
         """Return PredictBatchFunction using a closure over the model"""
 
-        def predict(inputs: np.ndarray) -> np.ndarray:
-            # check GPU status before processing
-            # self._nvidia_smi()
+        # check on the nvidia stats when generating the predict function
+        self._nvidia_smi()
 
-            images = [Image.open(io.BytesIO(input)) for input in inputs]
-            model_inputs = torch.stack(
-                [self.transforms(img).to(self.device) for img in images]
-            )
+        def predict(inputs: np.ndarray) -> np.ndarray:
+            images = []
+            for input in inputs:
+                img = Image.open(io.BytesIO(input)).convert("RGB")  # convert to RGB
+                images.append(self.transforms(img).to(self.device))
+
+            model_inputs = torch.stack(images)  # stack the images
 
             with torch.no_grad():
                 features = self.model.forward_features(model_inputs)
-                cls_token = features[:, 0, :]
-
-            # check GPU status after processing
-            # self._nvidia_smi()
+                cls_token = features[:, 0, :]  # extract [CLS] token embeddings
 
             # return the computed embeddings as numpy array
             numpy_array = cls_token.cpu().numpy()

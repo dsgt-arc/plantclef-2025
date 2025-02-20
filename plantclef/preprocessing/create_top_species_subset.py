@@ -1,9 +1,8 @@
 import argparse
-
+from typing_extensions import Annotated
 from pyspark.sql import functions as F
 
 from plantclef.spark import get_spark
-from plantclef.config import get_home_dir
 
 
 def get_subset_dataframe(
@@ -68,37 +67,35 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def main(
+    input_path: Annotated[str, "Path to the input data"],
+    output_path: Annotated[str, "Path to the output data"],
+    cores: Annotated[int, "Number of cores used in Spark driver"] = 6,
+    memory: Annotated[str, "Amount of memory to use in Spark driver"] = "16g",
+    top_n: Annotated[int, "Number of top species to include (default: 20)"] = 20,
+):
     """
     Main function that processes data and writes the
     output dataframe to plantclef directory on PACE.
     """
-    args = parse_args()
 
     # initialize Spark with settings for the driver
     spark = get_spark(
-        cores=args.cores, memory=args.memory, **{"spark.sql.shuffle.partitions": 500}
+        cores=cores, memory=memory, **{"spark.sql.shuffle.partitions": 200}
     )
-
-    # set input and output paths
-    home_dir = get_home_dir()
-    data_path = f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/data/parquet/"
-    input_path = f"{data_path}/train"
-    output_path = f"{data_path}/subset_top{args.top_n}_train"
 
     # get subset dataframe with top N species
     subset_df = get_subset_dataframe(
         spark=spark,
         train_data_path=input_path,
-        top_n=args.top_n,
+        top_n=top_n,
     )
 
     # write the DataFrame to PACE in Parquet format
     subset_df.write.mode("overwrite").parquet(output_path)
     print(f"Subset dataframe written to: {output_path}")
+
+    # print schema and count
+    subset_df.printSchema()
     count = subset_df.count()
     print(f"Number of rows in subset dataframe: {count}")
-
-
-if __name__ == "__main__":
-    main()
