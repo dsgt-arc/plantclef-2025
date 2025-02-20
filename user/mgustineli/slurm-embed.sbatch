@@ -45,7 +45,7 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # define paths
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
-project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef
+project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
 dataset_name=subset_top20_train
 
 # run Python script

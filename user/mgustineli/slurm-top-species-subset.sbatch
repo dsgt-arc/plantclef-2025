@@ -10,7 +10,9 @@
 #SBATCH -oReport-%j.log                         # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
+
 set -xe
+export NO_REINSTALL=1
 
 # Print job info
 echo "Job ID: $SLURM_JOB_ID"
@@ -26,5 +28,15 @@ export PYSPARK_DRIVER_MEMORY=20g
 export PYSPARK_EXECUTOR_MEMORY=20g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
+# define variables
+scratch_data_dir=$(realpath ~/scratch/plantclef/data)
+project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
+top_n=50
+
 # Run Python script
-python ~/clef/plantclef-2025/plantclef/preprocessing/create_top_species_subset.py --top-n 5
+plantclef preprocessing create_top_species_subset \
+    $scratch_data_dir/parquet/train \
+    $project_data_dir/parquet/subset_top${top_n}_train \
+    --cores 6 \
+    --memory 16g \
+    --top-n $top_n
