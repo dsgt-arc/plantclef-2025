@@ -145,14 +145,16 @@ class WrappedFineTunedDINOv2(
         self._nvidia_smi()
 
         def predict(inputs: np.ndarray) -> np.ndarray:
-            images = [Image.open(io.BytesIO(input)) for input in inputs]
-            model_inputs = torch.stack(
-                [self.transforms(img).to(self.device) for img in images]
-            )
+            images = []
+            for input in inputs:
+                img = Image.open(io.BytesIO(input)).convert("RGB")  # convert to RGB
+                images.append(self.transforms(img).to(self.device))
+
+            model_inputs = torch.stack(images)  # stack the images
 
             with torch.no_grad():
                 features = self.model.forward_features(model_inputs)
-                cls_token = features[:, 0, :]
+                cls_token = features[:, 0, :]  # extract [CLS] token embeddings
 
             # return the computed embeddings as numpy array
             numpy_array = cls_token.cpu().numpy()
