@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
 #SBATCH --cpus-per-task=6                       # Number of cores per task
 #SBATCH --mem-per-gpu=64G                       # Memory per core
-#SBATCH --time=10:00:00                         # Duration of the job (8 hours)
+#SBATCH --time=10:00:00                         # Duration of the job (10 hours)
 #SBATCH --qos=embers                            # QOS Name
 #SBATCH --output=Report-%j.log                  # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
