@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=plantclef-embed              # Job name
+#SBATCH --job-name=plantclef-embed-large        # Job name
 #SBATCH --account=paceship-dsgt_clef2025        # charge account
 #SBATCH --nodes=1                               # Number of nodes
 #SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
 #SBATCH --cpus-per-task=6                       # Number of cores per task
 #SBATCH --mem-per-gpu=64G                       # Memory per core
-#SBATCH --time=12:00:00                         # Duration of the job (12 hours)
+#SBATCH --time=120                              # Duration of the job (1h20min)
 #SBATCH --qos=embers                            # QOS Name
 #SBATCH --output=Report-%j.log                  # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
@@ -44,7 +44,7 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 # define paths
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
-dataset_name=subset_top50_train
+dataset_name=train
 
 # run Python script
 plantclef embedding workflow \
