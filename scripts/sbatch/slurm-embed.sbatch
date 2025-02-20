@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
 #SBATCH --cpus-per-task=6                       # Number of cores per task
 #SBATCH --mem-per-gpu=64G                       # Memory per core
-#SBATCH --time=10:00:00                         # Duration of the job (10 hours)
+#SBATCH --time=120                              # Duration of the job (1h20min)
 #SBATCH --qos=embers                            # QOS Name
 #SBATCH --output=Report-%j.log                  # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
@@ -44,12 +44,12 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 # define paths
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
-dataset_name=subset_top50_train
+dataset_name=subset_top20_train
 
 # run Python script
 plantclef embedding workflow \
     $scratch_data_dir/parquet/$dataset_name \
-    $scratch_data_dir/embeddings/${dataset_name}_embeddings/${SLURM_JOB_ID}_$dataset_name \
+    $scratch_data_dir/embeddings/${dataset_name}_embeddings \
     --cpu-count 6 \
     --batch-size 1 \
     --num-sample-ids 5 \
