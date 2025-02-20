@@ -11,7 +11,7 @@
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
 
-# for parallel runs, break into 20 jobs 20 at a time e.g.
+# for parallel runs, break into 5 jobs 5 at a time e.g.
 #SBATCH --array=0-4%5
 
 set -xe
@@ -44,12 +44,12 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 # define paths
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
-dataset_name=subset_top20_train
+dataset_name=subset_top50_train
 
 # run Python script
 plantclef embedding workflow \
     $scratch_data_dir/parquet/$dataset_name \
-    $scratch_data_dir/embeddings/${dataset_name}_embeddings \
+        $scratch_data_dir/embeddings/${dataset_name}_embeddings \
     --cpu-count 6 \
     --batch-size 1 \
     --num-sample-ids 5 \

@@ -105,16 +105,8 @@ class ProcessEmbeddings(luigi.Task):
                 .drop("sample_id")
             )
 
-            print("Initial number of partitions:", df.rdd.getNumPartitions())
-            # Coalesce to 1 partition to force serialization of GPU tasks
-            # df = df.coalesce(8)
-            print(
-                "Number of partitions after coalescing for GPU inference:",
-                df.rdd.getNumPartitions(),
-            )
-
             model = PipelineModel.load(f"{self.output_path}/model")
-            model.write().overwrite().save(f"{self.output_path}/model")
+
             # transform the dataframe and write to disk
             transformed = self.transform(model, df, self.feature_columns)
 
