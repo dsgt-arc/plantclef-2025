@@ -47,11 +47,12 @@ class ProcessEmbeddings(luigi.Task):
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
+    # we break the dataset into a number of samples that are processed in parallel
     sample_col = luigi.Parameter(default="image_name")
     sample_id = luigi.OptionalIntParameter(default=None)
+    num_sample_ids = luigi.OptionalIntParameter(default=20)
     # controls the number of partitions written to disk, must be at least the number
     # of tasks that we have in parallel to best take advantage of disk
-    num_sample_ids = luigi.OptionalIntParameter(default=20)
     num_partitions = luigi.OptionalIntParameter(default=20)
     cpu_count = luigi.IntParameter(default=4)
     batch_size = luigi.IntParameter(default=32)
