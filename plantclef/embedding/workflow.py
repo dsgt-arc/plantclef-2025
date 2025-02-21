@@ -1,45 +1,44 @@
 import luigi
 import typer
 from typing_extensions import Annotated
-from pyspark.ml import Pipeline, PipelineModel
+from pyspark.ml import Pipeline
 from pyspark.ml.feature import SQLTransformer
 from pyspark.ml.functions import vector_to_array
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from plantclef.model_setup import setup_fine_tuned_model
 from plantclef.embedding.transform import WrappedFineTunedDINOv2
 from plantclef.spark import spark_resource
 
 
-class ProcessDINOv2Pipeline(luigi.Task):
-    """Task to process embeddings using a DINOv2 model."""
+# class ProcessDINOv2Pipeline(luigi.Task):
+#     """Task to process embeddings using a DINOv2 model."""
 
-    output_path = luigi.Parameter()
-    sql_statement = luigi.Parameter()
-    model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
-    model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
-    batch_size = luigi.IntParameter(default=32)
+#     output_path = luigi.Parameter()
+#     sql_statement = luigi.Parameter()
+#     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
+#     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
+#     batch_size = luigi.IntParameter(default=32)
 
-    def output(self):
-        return luigi.LocalTarget(f"{self.output_path}/metadata/_SUCCESS")
+#     def output(self):
+#         return luigi.LocalTarget(f"{self.output_path}/metadata/_SUCCESS")
 
-    def pipeline(self) -> Pipeline:
-        dinov2_model = WrappedFineTunedDINOv2(
-            input_col="data",
-            output_col="cls_embedding",
-            model_path=self.model_path,
-            model_name=self.model_name,
-            batch_size=self.batch_size,
-        )
-        return Pipeline(
-            stages=[dinov2_model, SQLTransformer(statement=self.sql_statement)]
-        )
+#     def pipeline(self) -> Pipeline:
+#         dinov2_model = WrappedFineTunedDINOv2(
+#             input_col="data",
+#             output_col="cls_embedding",
+#             model_path=self.model_path,
+#             model_name=self.model_name,
+#             batch_size=self.batch_size,
+#         )
+#         return Pipeline(
+#             stages=[dinov2_model, SQLTransformer(statement=self.sql_statement)]
+#         )
 
-    def run(self):
-        with spark_resource() as spark:
-            model = self.pipeline().fit(spark.createDataFrame([[""]], ["image_name"]))
-            model.write().overwrite().save(f"{self.output_path}")
+# def run(self):
+#     with spark_resource() as spark:
+#         model = self.pipeline().fit(spark.createDataFrame([[""]], ["image_name"]))
+#         model.write().overwrite().save(f"{self.output_path}")
 
 
 class ProcessEmbeddings(luigi.Task):
@@ -66,14 +65,29 @@ class ProcessEmbeddings(luigi.Task):
             f"{self.output_path}/data/sample_id={self.sample_id}/_SUCCESS"
         )
 
-    def requires(self):
-        return [
-            ProcessDINOv2Pipeline(
-                output_path=f"{self.output_path}/model",
-                sql_statement=self.sql_statement,
-                batch_size=self.batch_size,
-            )
-        ]
+    # def requires(self):
+    #     return [
+    #         ProcessDINOv2Pipeline(
+    #             output_path=f"{self.output_path}/model",
+    #             sql_statement=self.sql_statement,
+    #             batch_size=self.batch_size,
+    #         )
+    #     ]
+
+    def pipeline(self):
+        model = Pipeline(
+            stages=[
+                WrappedFineTunedDINOv2(
+                    input_col="data",
+                    output_col="cls_embedding",
+                    model_path=self.model_path,
+                    model_name=self.model_name,
+                    batch_size=self.batch_size,
+                ),
+                SQLTransformer(statement=self.sql_statement),
+            ]
+        )
+        return model
 
     @property
     def feature_columns(self) -> list:
@@ -106,10 +120,11 @@ class ProcessEmbeddings(luigi.Task):
                 .drop("sample_id")
             )
 
-            model = PipelineModel.load(f"{self.output_path}/model")
+            # create the pipeline model
+            pipeline_model = self.pipeline().fit(df)
 
             # transform the dataframe and write to disk
-            transformed = self.transform(model, df, self.feature_columns)
+            transformed = self.transform(pipeline_model, df, self.feature_columns)
 
             transformed.printSchema()
             transformed.explain()
