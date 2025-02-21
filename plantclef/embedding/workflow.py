@@ -9,36 +9,7 @@ from pyspark.sql import functions as F
 
 from plantclef.embedding.transform import WrappedFineTunedDINOv2
 from plantclef.spark import spark_resource
-
-
-# class ProcessDINOv2Pipeline(luigi.Task):
-#     """Task to process embeddings using a DINOv2 model."""
-
-#     output_path = luigi.Parameter()
-#     sql_statement = luigi.Parameter()
-#     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
-#     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
-#     batch_size = luigi.IntParameter(default=32)
-
-#     def output(self):
-#         return luigi.LocalTarget(f"{self.output_path}/metadata/_SUCCESS")
-
-#     def pipeline(self) -> Pipeline:
-#         dinov2_model = WrappedFineTunedDINOv2(
-#             input_col="data",
-#             output_col="cls_embedding",
-#             model_path=self.model_path,
-#             model_name=self.model_name,
-#             batch_size=self.batch_size,
-#         )
-#         return Pipeline(
-#             stages=[dinov2_model, SQLTransformer(statement=self.sql_statement)]
-#         )
-
-# def run(self):
-#     with spark_resource() as spark:
-#         model = self.pipeline().fit(spark.createDataFrame([[""]], ["image_name"]))
-#         model.write().overwrite().save(f"{self.output_path}")
+from plantclef.model_setup import setup_fine_tuned_model
 
 
 class ProcessEmbeddings(luigi.Task):
@@ -46,33 +17,26 @@ class ProcessEmbeddings(luigi.Task):
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
+    cpu_count = luigi.IntParameter(default=4)
+    batch_size = luigi.IntParameter(default=32)
+    num_partitions = luigi.OptionalIntParameter(default=20)
     # we break the dataset into a number of samples that are processed in parallel
     sample_col = luigi.Parameter(default="image_name")
     sample_id = luigi.OptionalIntParameter(default=None)
     num_sample_ids = luigi.OptionalIntParameter(default=20)
     # controls the number of partitions written to disk, must be at least the number
     # of tasks that we have in parallel to best take advantage of disk
-    num_partitions = luigi.OptionalIntParameter(default=20)
-    cpu_count = luigi.IntParameter(default=4)
-    batch_size = luigi.IntParameter(default=32)
     sql_statement = luigi.Parameter(
         default="SELECT image_name, species_id, cls_embedding FROM __THIS__"
     )
+    model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
+    model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
 
     def output(self):
         # write a partitioned dataset to disk
         return luigi.LocalTarget(
             f"{self.output_path}/data/sample_id={self.sample_id}/_SUCCESS"
         )
-
-    # def requires(self):
-    #     return [
-    #         ProcessDINOv2Pipeline(
-    #             output_path=f"{self.output_path}/model",
-    #             sql_statement=self.sql_statement,
-    #             batch_size=self.batch_size,
-    #         )
-    #     ]
 
     def pipeline(self):
         model = Pipeline(
@@ -158,11 +122,11 @@ class Workflow(luigi.WrapperTask):
             task = ProcessEmbeddings(
                 input_path=self.input_path,
                 output_path=self.output_path,
+                cpu_count=self.cpu_count,
+                batch_size=self.batch_size,
                 sample_id=sample_id,
                 num_sample_ids=self.num_sample_ids,
                 num_partitions=self.num_partitions,
-                cpu_count=self.cpu_count,
-                batch_size=self.batch_size,
             )
             tasks.append(task)
         yield tasks

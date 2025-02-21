@@ -12,7 +12,7 @@
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
 
 # for parallel runs, break into 5 jobs 5 at a time e.g.
-#SBATCH --array=0-1%2
+#SBATCH --array=0-4%5
 
 set -xe
 export NO_REINSTALL=1
@@ -44,7 +44,7 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 # define paths
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
-dataset_name=subset_top10_train
+dataset_name=subset_top50_train
 
 # run Python script
 plantclef embedding workflow \
@@ -52,7 +52,7 @@ plantclef embedding workflow \
     $scratch_data_dir/embeddings/${dataset_name}_embeddings \
     --cpu-count 6 \
     --batch-size 1 \
-    --num-sample-ids 2 \
+    --num-sample-ids 5 \
     --sample-id $SLURM_ARRAY_TASK_ID
 
 # parse the nvida monitoring output
