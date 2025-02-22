@@ -5,13 +5,13 @@
 #SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
 #SBATCH --cpus-per-task=6                       # Number of cores per task
 #SBATCH --mem-per-gpu=64G                       # Memory per core
-#SBATCH --time=10:00:00                         # Duration of the job (10 hours)
+#SBATCH --time=120                              # Duration of the job (1h20min)
 #SBATCH --qos=embers                            # QOS Name
 #SBATCH --output=Report-%j.log                  # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
 
-# for parallel runs, break into 20 jobs 20 at a time e.g.
+# for parallel runs, break into 5 jobs 5 at a time e.g.
 #SBATCH --array=0-4%5
 
 set -xe
@@ -32,7 +32,7 @@ nvidia-smi                                                  # Check GPU usage
 
 # start the nvidia monitoring job in the background using SLURM job id
 NVIDIA_LOG_FILE=Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
-python ~/clef/plantclef-2025/scripts/nvidia-logs.sh monitor "$NVIDIA_LOG_FILE" --interval 10 &
+python ~/clef/plantclef-2025/scripts/nvidia-logs.sh monitor "$NVIDIA_LOG_FILE" --interval 15 &
 nvidia_logs_pid=$!
 echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
 
@@ -49,7 +49,7 @@ dataset_name=subset_top50_train
 # run Python script
 plantclef embedding workflow \
     $scratch_data_dir/parquet/$dataset_name \
-    $scratch_data_dir/embeddings/${dataset_name}_embeddings/${SLURM_JOB_ID}_$dataset_name \
+    $scratch_data_dir/embeddings/${dataset_name}_embeddings \
     --cpu-count 6 \
     --batch-size 1 \
     --num-sample-ids 5 \

@@ -32,7 +32,7 @@ nvidia-smi                                                  # Check GPU usage
 
 # start the nvidia monitoring job in the background using SLURM job id
 NVIDIA_LOG_FILE=Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
-python ~/clef/plantclef-2025/scripts/nvidia-logs.sh monitor "$NVIDIA_LOG_FILE" --interval 10 &
+python ~/clef/plantclef-2025/scripts/nvidia-logs.sh monitor "$NVIDIA_LOG_FILE" --interval 15 &
 nvidia_logs_pid=$!
 echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
 
@@ -49,7 +49,7 @@ dataset_name=train
 # run Python script
 plantclef embedding workflow \
     $scratch_data_dir/parquet/$dataset_name \
-    $scratch_data_dir/embeddings/${dataset_name}_embeddings/${SLURM_JOB_ID}_$dataset_name \
+    $scratch_data_dir/embeddings/${dataset_name}_embeddings \
     --cpu-count 6 \
     --batch-size 1 \
     --num-sample-ids 20 \
