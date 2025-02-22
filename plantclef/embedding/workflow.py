@@ -100,7 +100,7 @@ class ProcessEmbeddings(luigi.Task):
 
 
 class Workflow(luigi.WrapperTask):
-    """Workflow with two tasks."""
+    """Workflow with one task."""
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
@@ -124,9 +124,9 @@ class Workflow(luigi.WrapperTask):
                 output_path=self.output_path,
                 cpu_count=self.cpu_count,
                 batch_size=self.batch_size,
+                num_partitions=self.num_partitions,
                 sample_id=sample_id,
                 num_sample_ids=self.num_sample_ids,
-                num_partitions=self.num_partitions,
             )
             tasks.append(task)
         yield tasks
