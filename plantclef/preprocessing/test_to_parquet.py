@@ -1,10 +1,10 @@
 """
 Before running this script, make sure you have downloaded and extracted the test dataset into the data folder.
-Use the bash file `download_extract_dataset.sh` in the scripts folder.
+Use the sbatch file `slurm-extract-data.sbatch` in the `plantclef-2025/scripts/sbatch` folder.
 """
 
 import os
-import argparse
+from typing_extensions import Annotated
 from pathlib import Path
 
 from pyspark.sql import functions as F
@@ -48,60 +48,36 @@ def create_spark_test_dataframe(spark, image_base_path: Path):
     return image_final_df
 
 
-def parse_args():
-    """Parse command line arguments."""
-    home_dir = get_home_dir()
-    dataset_base_path = f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/data"
-
-    parser = argparse.ArgumentParser(
-        description="Process test image dataset stored on PACE."
-    )
-    parser.add_argument(
-        "--cores",
-        type=int,
-        default=os.cpu_count(),
-        help="Number of cores used in Spark driver",
-    )
-    parser.add_argument(
-        "--memory",
-        type=str,
-        default="16g",
-        help="Amount of memory to use in Spark driver",
-    )
-    parser.add_argument(
-        "--image-root-path",
-        type=str,
-        default=f"{dataset_base_path}/test/",
-        help="Base directory path for image data",
-    )
-    parser.add_argument(
-        "--output-path",
-        type=str,
-        default=f"{dataset_base_path}/parquet/test",
-        help="PACE path for output Parquet files",
-    )
-
-    return parser.parse_args()
-
-
-def main():
+def main(
+    input_path: Annotated[str, "Path to the input data"],
+    output_path: Annotated[str, "Path to the output data"],
+    cores: Annotated[int, "Number of cores used in Spark driver"] = 6,
+    memory: Annotated[str, "Amount of memory to use in Spark driver"] = "16g",
+):
     """
     Main function that processes data and writes the
     output dataframe to plantclef directory on PACE.
     """
-    args = parse_args()
 
     # Initialize Spark
-    spark = get_spark(cores=args.cores, memory=args.memory)
+    spark = get_spark(
+        cores=cores, memory=memory, **{"spark.sql.shuffle.partitions": 20}
+    )
 
-    # Convert raw-root-path to a Path object here
-    image_base_path = Path(args.image_root_path)
+    # create path object
+    input_path = Path(input_path)
 
     # Create test image dataframe
-    final_df = create_spark_test_dataframe(spark=spark, image_base_path=image_base_path)
+    final_df = create_spark_test_dataframe(spark=spark, image_base_path=input_path)
 
     # Write the DataFrame to PACE in Parquet format
-    final_df.write.mode("overwrite").parquet(args.output_path)
+    final_df.write.mode("overwrite").parquet(output_path)
+    print(f"Subset dataframe written to: {output_path}")
+
+    # print schema and count
+    final_df.printSchema()
+    count = final_df.count()
+    print(f"Number of rows in subset dataframe: {count}")
 
 
 if __name__ == "__main__":
