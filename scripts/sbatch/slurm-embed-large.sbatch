@@ -32,7 +32,7 @@ nvidia-smi                                                  # Check GPU usage
 
 # start the nvidia monitoring job in the background using SLURM job id
 NVIDIA_LOG_FILE=Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
-python ~/clef/plantclef-2025/scripts/nvidia-logs.sh monitor "$NVIDIA_LOG_FILE" --interval 10 &
+python ~/clef/plantclef-2025/scripts/nvidia-logs.sh monitor "$NVIDIA_LOG_FILE" --interval 15 &
 nvidia_logs_pid=$!
 echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
 
