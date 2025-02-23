@@ -17,9 +17,14 @@ from segment_anything import SamPredictor
 from typing import List
 import torch
 from groundingdino.util.inference import Model
-from pyspark.sql.types import StructType, StructField, BinaryType, StringType, MapType
+from pyspark.sql.types import StructType, StructField, BinaryType
 from segment_anything import sam_model_registry
 from pyspark.sql.functions import udf
+import sys
+
+os.environ["PYSPARK_PYTHON"] = sys.executable
+os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+
 
 HOME = Path(os.path.expanduser("~"))
 SAM_ENCODER_VERSION = "vit_h"
@@ -61,7 +66,7 @@ CLASSES = [
 ]
 BOX_TRESHOLD = 0.15
 TEXT_TRESHOLD = 0.1
-include_class_ids = {0, 1, 6, 7, 9}
+include_class_ids = {0, 1, 6}
 print("Initial Setup done")
 
 
@@ -122,7 +127,12 @@ def process_image(binary_data):
     )
 
     merged_masks = []
-    per_class_mask_dict = {}
+    # per_class_mask_dict = {}
+    class_mask_results = {
+        "leaf": None,
+        "flower": None,
+        "plant": None,
+    }
     grouped = {}
     for mask, class_id in zip(detections.mask, detections.class_id):
         grouped.setdefault(class_id, []).append(mask)
@@ -133,7 +143,7 @@ def process_image(binary_data):
                 merged_mask = np.any(np.stack(masks, axis=0), axis=0)
                 merged_masks.append(merged_mask)
                 mask_uint8 = (merged_mask.astype(np.uint8)) * 255
-                per_class_mask_dict[CLASSES[class_id]] = image_to_bytes(
+                class_mask_results[CLASSES[class_id]] = image_to_bytes(
                     mask_uint8, ext=".png"
                 )
 
@@ -143,15 +153,22 @@ def process_image(binary_data):
         final_mask_bytes = image_to_bytes(final_mask_uint8, ext=".png")
     else:
         final_mask_bytes = None
-        per_class_mask_dict = {}
+        # per_class_mask_dict = {}
 
-    return (final_mask_bytes, per_class_mask_dict)
+    return (
+        final_mask_bytes,
+        class_mask_results["leaf"],
+        class_mask_results["flower"],
+        class_mask_results["plant"],
+    )
 
 
-mask_schema = StructType(
+output_schema = StructType(
     [
         StructField("final_mask", BinaryType(), True),
-        StructField("class_masks", MapType(StringType(), BinaryType()), True),
+        StructField("leaf", BinaryType(), True),
+        StructField("flower", BinaryType(), True),
+        StructField("plant", BinaryType(), True),
     ]
 )
 
@@ -204,17 +221,19 @@ def main():
     output dataframe to plantclef directory on PACE.
     """
     args = parse_args()
-    process_image_udf = udf(process_image, mask_schema)
+    process_image_udf = udf(process_image, output_schema)
 
     # Initialize Spark
     spark = get_spark(cores=args.cores, memory=args.memory)
 
     existing_df = spark.read.parquet(args.input_path)
-    updated_df = existing_df.withColumn("masks", process_image_udf(F.col("data")))
     updated_df = (
-        updated_df.withColumn("final_mask", F.col("masks").getField("final_mask"))
-        .withColumn("class_masks", F.col("masks").getField("class_masks"))
-        .drop("masks")
+        existing_df.withColumn("mask_struct", process_image_udf(F.col("data")))
+        .withColumn("final_mask", F.col("mask_struct").getField("final_mask"))
+        .withColumn("leaf", F.col("mask_struct").getField("leaf"))
+        .withColumn("flower", F.col("mask_struct").getField("flower"))
+        .withColumn("plant", F.col("mask_struct").getField("plant"))
+        .drop("mask_struct")
     )
 
     updated_df = updated_df.repartition(2000)
