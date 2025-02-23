@@ -57,7 +57,7 @@ plantclef inference workflow \
     --cpu-count 6 \
     --batch-size 1 \
     --grid-size 6 \
-    --top-k-proba 5 \
+    --top-k-proba 9 \
     --num-sample-ids 1 \
     --sample-id 0 \
 
