@@ -2,9 +2,9 @@
 #SBATCH --job-name=plantclef-embed              # Job name
 #SBATCH --account=paceship-dsgt_clef2025        # charge account
 #SBATCH --nodes=1                               # Number of nodes
-##SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
-#SBATCH --gres=gpu:1                            # GPU resource
-#SBATCH -C RTX6000                              # GPU type
+#SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
+##SBATCH --gres=gpu:1                            # GPU resource
+##SBATCH -C RTX6000                              # GPU type
 #SBATCH --cpus-per-task=6                       # Number of cores per task
 #SBATCH --mem-per-gpu=64G                       # Memory per core
 #SBATCH --time=120                              # Duration of the job (1h20min)
@@ -48,8 +48,6 @@ scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
 submission_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/submissions
 dataset_name=test_2024
-grid_size=3
-top_k_proba=5
 
 # run Python script
 plantclef inference workflow \
@@ -58,7 +56,7 @@ plantclef inference workflow \
     $submission_dir \
     --cpu-count 6 \
     --batch-size 1 \
-    --grid-size 3 \
+    --grid-size 6 \
     --top-k-proba 5 \
     --num-sample-ids 1 \
     --sample-id 0 \
