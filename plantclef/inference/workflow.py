@@ -36,7 +36,7 @@ class ProcessInference(luigi.Task):
     def output(self):
         # write a partitioned dataset to disk
         return luigi.LocalTarget(
-            f"{self.output_path}/data/sample_id={self.sample_id}/_SUCCESS"
+            f"{self.output_path}/sample_id={self.sample_id}/_SUCCESS"
         )
 
     def pipeline(self):
@@ -97,8 +97,9 @@ class ProcessInference(luigi.Task):
             transformed.explain()
             (
                 transformed.repartition(self.num_partitions)
+                .cache()
                 .write.mode("overwrite")
-                .parquet(f"{self.output_path}/data/sample_id={self.sample_id}")
+                .parquet(f"{self.output_path}/sample_id={self.sample_id}")
             )
 
 
@@ -126,7 +127,7 @@ class Workflow(luigi.Task):
             sample_ids = list(range(self.num_tasks))
 
         if self.use_grid:
-            file_name = f"grid_{self.grid_size}x{self.grid_size}"
+            file_name = f"grid={self.grid_size}x{self.grid_size}"
             output_path = f"{self.output_path}/{file_name}"
         tasks = []
         for sample_id in sample_ids:

@@ -199,10 +199,10 @@ class InferenceFineTunedDINOv2(
                 item for grid in results for item in grid[:limit_logits]
             ]
             # sort by score in descending order
-            sorted_results = sorted(
+            sorted_logits = sorted(
                 flattened_results, key=lambda x: -list(x.values())[0]
             )
-            return sorted_results
+            return sorted_logits
 
         return predict
 

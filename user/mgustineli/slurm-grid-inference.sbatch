@@ -52,7 +52,7 @@ dataset_name=test_2024
 # run Python script
 plantclef inference workflow \
     $project_data_dir/parquet/$dataset_name \
-    $project_data_dir/embeddings/${dataset_name}_embeddings \
+    $project_data_dir/logits/${dataset_name} \
     $submission_dir \
     --cpu-count 6 \
     --batch-size 1 \
