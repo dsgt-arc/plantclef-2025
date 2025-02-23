@@ -210,7 +210,7 @@ def main():
         .drop("mask_struct")
     )
 
-    updated_df = updated_df.repartition(2000)
+    updated_df = updated_df.repartition(500)
     updated_df.write.mode("overwrite").parquet(args.output_path)
     print("Updated Parquet file written to:", args.output_path)
 
