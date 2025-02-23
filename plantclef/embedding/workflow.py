@@ -155,8 +155,8 @@ def main(
                 output_path=output_path,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
-                sample_id=sample_id,
                 num_sample_ids=num_sample_ids,
+                sample_id=sample_id,
             )
         ],
         **kwargs,

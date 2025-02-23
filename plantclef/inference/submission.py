@@ -1,3 +1,4 @@
+import os
 import csv
 
 import luigi
@@ -16,9 +17,9 @@ class SubmissionTask(luigi.Task):
 
     def output(self):
         # save the model run
-        output_path = f"{self.output_path}/top{self.top_k}_species/_SUCCESS"
+        output_path = f"{self.output_path}/topk_{self.top_k}_species/_SUCCESS"
         if self.use_grid:
-            output_path = f"{self.output_path}/top{self.top_k}_species_grid_{self.grid_size}x{self.grid_size}/_SUCCESS"
+            output_path = f"{self.output_path}/topk_{self.top_k}_species_grid_{self.grid_size}x{self.grid_size}/_SUCCESS"
         return luigi.LocalTarget(output_path)
 
     def _format_species_ids(self, species_ids: list) -> str:
@@ -41,7 +42,7 @@ class SubmissionTask(luigi.Task):
         records = []
         for row in spark_df.collect():
             image_name = self._remove_extension(row["image_name"])
-            logits = row["dino_logits"]
+            logits = row["logits"]
             top_k_species = self._extract_top_k_species(logits)
             formatted_species = self._format_species_ids(top_k_species)
             records.append({"plot_id": image_name, "species_ids": formatted_species})
@@ -49,14 +50,18 @@ class SubmissionTask(luigi.Task):
         pandas_df = pd.DataFrame(records)
         return pandas_df
 
-    def _write_csv_to_gcs(self, df):
+    def _write_csv_to_pace(self, df):
         """Writes the Pandas DataFrame to a CSV file in GCS."""
-        folder_name = f"top_{self.top_k}_species"
+        folder_name = f"topk_{self.top_k}_species"
         if self.use_grid:
             grid_name = f"grid_{self.grid_size}x{self.grid_size}"
             folder_name = f"{folder_name}_{grid_name}"
         file_name = f"dsgt_run_{folder_name}.csv"
         output_path = f"{self.output_path}/{folder_name}/{file_name}"
+
+        # ensure directory exists before saving
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        # write to CSV
         df.to_csv(output_path, sep=";", index=False, quoting=csv.QUOTE_NONE)
 
     def run(self):
@@ -64,10 +69,11 @@ class SubmissionTask(luigi.Task):
             # read data
             transformed_df = spark.read.parquet(self.input_path)
             transformed_df = transformed_df.orderBy("image_name")
+            transformed_df.printSchema()
 
             # get prepared dataframe
             pandas_df = self._prepare_and_write_submission(transformed_df)
-            self._write_csv_to_gcs(pandas_df)
+            self._write_csv_to_pace(pandas_df)
 
             # write the output
             with self.output().open("w") as f:

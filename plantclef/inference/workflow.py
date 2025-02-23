@@ -23,15 +23,15 @@ class ProcessInference(luigi.Task):
     num_partitions = luigi.OptionalIntParameter(default=20)
     # we break the dataset into a number of samples that are processed in parallel
     sample_col = luigi.Parameter(default="image_name")
-    sample_id = luigi.OptionalIntParameter(default=None)
-    num_sample_ids = luigi.OptionalIntParameter(default=20)
+    sample_id = luigi.IntParameter(default=None)
+    num_sample_ids = luigi.IntParameter(default=20)
     # controls the number of partitions written to disk, must be at least the number
     # of tasks that we have in parallel to best take advantage of disk
-    sql_statement = luigi.Parameter(
-        default="SELECT image_name, species_id, logits FROM __THIS__"
-    )
     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
+    use_grid = luigi.BoolParameter(default=True)
+    grid_size = luigi.IntParameter(default=3)
+    sql_statement = luigi.Parameter(default="SELECT image_name, logits FROM __THIS__")
 
     def output(self):
         # write a partitioned dataset to disk
@@ -44,7 +44,7 @@ class ProcessInference(luigi.Task):
             stages=[
                 InferenceFineTunedDINOv2(
                     input_col="data",
-                    output_col="cls_embedding",
+                    output_col="logits",
                     model_path=self.model_path,
                     model_name=self.model_name,
                     batch_size=self.batch_size,
@@ -58,7 +58,7 @@ class ProcessInference(luigi.Task):
 
     @property
     def feature_columns(self) -> list:
-        return ["cls_embedding"]
+        return ["logits"]
 
     def transform(self, model, df, features) -> DataFrame:
         transformed = model.transform(df)
@@ -107,14 +107,15 @@ class Workflow(luigi.Task):
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
+    submission_path = luigi.Parameter()
     sample_id = luigi.OptionalParameter()
     num_sample_ids = luigi.IntParameter(default=20)
     cpu_count = luigi.IntParameter(default=6)
     batch_size = luigi.IntParameter(default=32)
     # set use_grid=False to perform inference on the entire image
-    use_grid = luigi.Parameter(default=True)
-    grid_size = luigi.Parameter(default=3)  # 3x3 grid
-    top_k_proba = luigi.Parameter(default=5)  # top 5 species
+    use_grid = luigi.BoolParameter(default=True)
+    grid_size = luigi.IntParameter(default=3)  # 3x3 grid
+    top_k_proba = luigi.IntParameter(default=5)  # top 5 species
     num_partitions = luigi.IntParameter(default=10)
 
     def requires(self):
@@ -125,7 +126,8 @@ class Workflow(luigi.Task):
             sample_ids = list(range(self.num_tasks))
 
         if self.use_grid:
-            output_path = f"{self.output_path}/grid_{self.grid_size}x{self.grid_size}"
+            file_name = f"grid_{self.grid_size}x{self.grid_size}"
+            output_path = f"{self.output_path}/{file_name}"
         tasks = []
         for sample_id in sample_ids:
             task = ProcessInference(
@@ -137,16 +139,18 @@ class Workflow(luigi.Task):
                 num_sample_ids=self.num_sample_ids,
                 use_grid=self.use_grid,
                 grid_size=self.grid_size,
-                top_k_proba=self.top_k_proba,
                 num_partitions=self.num_partitions,
             )
             tasks.append(task)
-        yield tasks
 
-        # Submission task
+        # run ProcessInference tasks before the Submission task
+        for task in tasks:
+            yield task
+
+        # run Submission task
         yield SubmissionTask(
             input_path=output_path,
-            output_path=f"{self.output_path}/grid_{self.grid_size}x{self.grid_size}",
+            output_path=self.submission_path,
             top_k=self.top_k_proba,
             use_grid=self.use_grid,
             grid_size=self.grid_size,
@@ -156,13 +160,14 @@ class Workflow(luigi.Task):
 def main(
     input_path: Annotated[str, typer.Argument(help="Input root directory")],
     output_path: Annotated[str, typer.Argument(help="Output root directory")],
+    submission_path: Annotated[str, typer.Argument(help="Submission root directory")],
     cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 4,
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
     use_grid: Annotated[bool, typer.Option(help="Use grid")] = True,
     grid_size: Annotated[int, typer.Option(help="Grid size")] = 3,
-    top_k_proba: Annotated[int, typer.Option(help="Top k probability")] = 5,
+    top_k_proba: Annotated[int, typer.Option(help="Top K probability")] = 5,
     num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 10,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
@@ -178,10 +183,11 @@ def main(
             Workflow(
                 input_path=input_path,
                 output_path=output_path,
+                submission_path=submission_path,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
-                sample_id=sample_id,
                 num_sample_ids=num_sample_ids,
+                sample_id=sample_id,
                 use_grid=use_grid,
                 grid_size=grid_size,
                 top_k_proba=top_k_proba,
