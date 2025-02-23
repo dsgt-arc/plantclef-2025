@@ -21,3 +21,10 @@ def get_scratch_data_dir() -> str:
 def get_home_dir():
     """Get the home directory for the current user on PACE."""
     return Path(os.path.expanduser("~"))
+
+
+def get_class_mappings_file() -> str:
+    """
+    Get the directory containing the class mappings for the DINOv2 model.
+    """
+    return f"{get_data_dir()}/train/PlantCLEF2024/class_mapping.txt"

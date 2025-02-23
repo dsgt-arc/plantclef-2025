@@ -1,4 +1,3 @@
-import argparse
 from typing_extensions import Annotated
 from pyspark.sql import functions as F
 
@@ -37,34 +36,6 @@ def get_subset_dataframe(
     subset_df = train_df.join(F.broadcast(top_n_species), on="species_id", how="inner")
 
     return subset_df
-
-
-def parse_args():
-    """Parse command-line arguments."""
-
-    parser = argparse.ArgumentParser(
-        description="Process images and metadata for a dataset stored on PACE."
-    )
-    parser.add_argument(
-        "--cores",
-        type=int,
-        default=6,
-        help="Number of cores used in Spark driver",
-    )
-    parser.add_argument(
-        "--memory",
-        type=str,
-        default="16g",
-        help="Amount of memory to use in Spark driver",
-    )
-    parser.add_argument(
-        "--top-n",
-        type=int,
-        default=20,
-        help="Number of top species to include (default: 20)",
-    )
-
-    return parser.parse_args()
 
 
 def main(

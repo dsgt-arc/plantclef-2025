@@ -91,7 +91,7 @@ class WrappedFineTunedDINOv2(
     DefaultParamsWritable,
 ):
     """
-    Wrapper for fine-tuned DINOv2 to add it to the pipeline
+    Wrapper for fine-tuned DINOv2 to add it to the pipeline.
     """
 
     def __init__(

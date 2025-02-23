@@ -7,10 +7,12 @@
 #SBATCH --mem-per-cpu=16G                       # Total memory per core for the job
 #SBATCH --time=8:00:00                          # Duration of the job (8 hours)
 #SBATCH --qos=inferno                           # QOS Name (inferno or embers)
-#SBATCH -oReport-%j.out                         # Combined output and error messages file
+#SBATCH -oReport-%j.log                         # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
+
 set -xe
+export NO_REINSTALL=1
 
 # Print job info
 echo "Job ID: $SLURM_JOB_ID"
@@ -18,9 +20,18 @@ echo "Hostname: $(hostname)"
 echo "Number of CPUs: $(nproc)"
 echo "Available memory: $(free -h)"
 
-# Load and activate Python module
-module load python/3.12.5                       # Load Python module
-source ~/scratch/plantclef/venv/bin/activate    # Activate the environment
+# activate the environment
+source ~/clef/plantclef-2025/scripts/activate.sh
+
+
+# define variables
+scratch_data_dir=$(realpath ~/scratch/plantclef/data)
+project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
+dataset_name=test_2024
 
 # Run Python script
-python ~/clef/plantclef-2025/plantclef/preprocessing/test_to_parquet.py
+plantclef preprocessing test_to_parquet \
+    $project_data_dir/$dataset_name \
+    $project_data_dir/parquet/$dataset_name \
+    --cores 6 \
+    --memory 16g

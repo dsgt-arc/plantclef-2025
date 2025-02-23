@@ -3,6 +3,7 @@ import io
 import timm
 import torch
 from PIL import Image
+from plantclef.config import get_class_mappings_file
 from plantclef.model_setup import setup_fine_tuned_model
 from pyspark.ml import Transformer
 from pyspark.ml.param import Param, Params, TypeConverters
@@ -71,7 +72,7 @@ class HasBatchSize(Param):
 
     def __init__(self):
         super().__init__(
-            default=8,
+            default=32,
             doc="The batch size to use for embedding extraction",
         )
 
@@ -79,7 +80,7 @@ class HasBatchSize(Param):
         return self.getOrDefault(self.batchSize)
 
 
-class PretrainedDinoV2(
+class InferenceFineTunedDINOv2(
     Transformer,
     HasInputCol,
     HasOutputCol,
@@ -89,6 +90,10 @@ class PretrainedDinoV2(
     DefaultParamsReadable,
     DefaultParamsWritable,
 ):
+    """
+    Wrapper for the fine-tuned DINOv2 model for inference.
+    """
+
     def __init__(
         self,
         input_col: str = "input",
@@ -96,8 +101,8 @@ class PretrainedDinoV2(
         model_path: str = setup_fine_tuned_model(),
         model_name: str = "vit_base_patch14_reg4_dinov2.lvd142m",
         batch_size: int = 8,
-        grid_size: int = 3,
         use_grid: bool = False,
+        grid_size: int = 3,
     ):
         super().__init__()
         self._setDefault(
@@ -108,23 +113,24 @@ class PretrainedDinoV2(
             batchSize=batch_size,
         )
         self.num_classes = 7806  # total number of plant species
-        self.local_directory = "/mnt/data/models/pretrained_models"
-        self.class_mapping_file = f"{self.local_directory}/class_mapping.txt"
-        # Model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = timm.create_model(
-            self.modelName,
+            self.getModelName(),
             pretrained=False,
             num_classes=self.num_classes,
-            checkpoint_path=self.modelPath,
+            checkpoint_path=self.getModelPath(),
         )
-        self.model.to(self.device)
-        self.model.eval()
         # Data transform
         self.data_config = timm.data.resolve_model_data_config(self.model)
         self.transforms = timm.data.create_transform(
             **self.data_config, is_training=False
         )
+        # Move model to GPU if available
+        self.model.to(self.device)
+        self.model.eval()
+        # path for class_mappings.txt file
+        self.class_mapping_file = get_class_mappings_file()
+        # load class mappings
         self.cid_to_spid = self._load_class_mapping()
         self.use_grid = use_grid
         self.grid_size = grid_size
@@ -148,17 +154,32 @@ class PretrainedDinoV2(
                 images.append(crop_image)
         return images
 
+    def _nvidia_smi(self):
+        from subprocess import run, PIPE
+
+        try:
+            result = run(
+                ["nvidia-smi"], check=True, stdout=PIPE, stderr=PIPE, text=True
+            )
+            print("=== GPU Utilization (before/after prediction) ===")
+            print(result.stdout)
+        except Exception as e:
+            print(f"nvidia-smi failed: {e}")
+
     def _make_predict_fn(self):
+        """Return UDF using a closure over the model"""
+
+        # check on the nvidia stats when generating the predict function
+        self._nvidia_smi()
+
         def predict(input_data):
             img = Image.open(io.BytesIO(input_data))
-            top_k_proba = 20
-            limit_logits = 20
+            top_k_proba = 10
+            limit_logits = 10
             images = [img]
-            # Use grid to get logits
+            # use grid to get logits
             if self.use_grid:
                 images = self._split_into_grid(img)
-                top_k_proba = 10
-                limit_logits = 5
             results = []
             for img in images:
                 processed_image = self.transforms(img).unsqueeze(0).to(self.device)
@@ -173,11 +194,11 @@ class PretrainedDinoV2(
                     for index, prob in zip(top_indices, top_probs)
                 ]
                 results.append(result)
-            # Flatten the results from all grids, get top 5 probabilities
+            # flatten the results from all grids, get top 5 probabilities
             flattened_results = [
                 item for grid in results for item in grid[:limit_logits]
             ]
-            # Sort by score in descending order
+            # sort by score in descending order
             sorted_results = sorted(
                 flattened_results, key=lambda x: -list(x.values())[0]
             )
