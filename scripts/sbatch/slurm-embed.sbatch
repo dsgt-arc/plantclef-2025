@@ -49,7 +49,7 @@ dataset_name=subset_top50_train
 # run Python script
 plantclef embedding workflow \
     $scratch_data_dir/parquet/$dataset_name \
-    $scratch_data_dir/embeddings/${dataset_name}_embeddings \
+    $scratch_data_dir/embeddings/${dataset_name} \
     --cpu-count 6 \
     --batch-size 1 \
     --num-sample-ids 5 \
