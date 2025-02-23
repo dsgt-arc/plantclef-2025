@@ -88,7 +88,6 @@ def process_image(binary_data):
             process_image.include_class_ids = {0, 1, 6}
             process_image.initialized = True
 
-        # Use the models loaded on this executor
         sam_predictor = process_image.sam_predictor
         grounding_dino_model = process_image.grounding_dino_model
         CLASSES = process_image.CLASSES
@@ -147,16 +146,6 @@ def process_image(binary_data):
         return (None, None, None, None)
 
 
-output_schema = StructType(
-    [
-        StructField("final_mask", BinaryType(), True),
-        StructField("leaf", BinaryType(), True),
-        StructField("flower", BinaryType(), True),
-        StructField("plant", BinaryType(), True),
-    ]
-)
-
-
 def parse_args():
     home_dir = get_home_dir()
     dataset_base_path = f"{home_dir}/shared/plantclef/data"
@@ -199,6 +188,15 @@ def parse_args():
 
 def main():
     args = parse_args()
+    output_schema = StructType(
+        [
+            StructField("final_mask", BinaryType(), True),
+            StructField("leaf", BinaryType(), True),
+            StructField("flower", BinaryType(), True),
+            StructField("plant", BinaryType(), True),
+        ]
+    )
+
     process_image_udf = udf(process_image, output_schema)
 
     spark = get_spark(cores=args.cores, memory=args.memory)
