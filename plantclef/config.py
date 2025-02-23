@@ -27,4 +27,9 @@ def get_class_mappings_file() -> str:
     """
     Get the directory containing the class mappings for the DINOv2 model.
     """
-    return f"{get_data_dir()}/train/PlantCLEF2024/class_mapping.txt"
+    home_dir = Path(os.path.expanduser("~"))
+    return f"{home_dir}/clef/plantclef-2025/plantclef/class_mapping.txt"
+
+
+if __name__ == "__main__":
+    print(get_class_mappings_file())
