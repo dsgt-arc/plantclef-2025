@@ -22,11 +22,12 @@ SOURCE_DIR=${1:-"$HOME/scratch/data/"}
 DEST_DIR=${1:-"$HOME/p-dsgt_clef2025-0/shared/plantclef/data"}
 TRAIN_DIR="$DEST_DIR/train"
 TEST_DIR="$DEST_DIR/test"
+TEST_2024_DIR="$DEST_DIR/test_2024"
 METADATA_DIR="$DEST_DIR/metadata"
 MODELS_DIR=${1:-"$HOME/p-dsgt_clef2025-0/shared/plantclef/models"}
 
 # Ensure directories exist
-for dir in "$TRAIN_DIR" "$TEST_DIR" "$METADATA_DIR" "$MODELS_DIR"; do
+for dir in "$TRAIN_DIR" "$TEST_DIR" "$TEST_2024_DIR" "$METADATA_DIR" "$MODELS_DIR"; do
     if [ ! -d "$dir" ]; then
         echo "Creating directory: $dir"
         mkdir -p "$dir"
@@ -43,6 +44,9 @@ for file in "$SOURCE_DIR"/raw/*.tar; do
     elif [[ "$file" == *"2025test.tar" ]]; then
         echo "Extracting $file into $TEST_DIR"
         tar -xf "$file" -C "$TEST_DIR"
+    elif [[ "$file" == *"PlantCLEF2024test.tar" ]]; then
+        echo "Extracting $file into $TEST_2024_DIR"
+        tar -xf "$file" -C "$TEST_2024_DIR"
     fi
 done
 
