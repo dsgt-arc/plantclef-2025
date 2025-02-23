@@ -102,11 +102,10 @@ def process_image(binary_data):
     Process a single image (from binary data) and return a tuple:
     (final_mask_bytes, class_masks_dict)
     """
-    # Decode the image from binary data
+
     nparr = np.frombuffer(binary_data, np.uint8)
     image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-    # Run detection & segmentation (adjust these calls as needed)
     detections = grounding_dino_model.predict_with_classes(
         image=image,
         classes=enhance_class_name(class_names=CLASSES),
@@ -114,16 +113,14 @@ def process_image(binary_data):
         text_threshold=TEXT_TRESHOLD,
     )
     # Filter out detections without a valid class id
-    detections = detections[detections.class_id is not None]
+    # detections = detections[detections.class_id is not None]
 
-    # Generate masks using your segmentation function
     detections.mask = segment(
         sam_predictor=sam_predictor,
         image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
         xyxy=detections.xyxy,
     )
 
-    # Group and merge masks per class
     merged_masks = []
     per_class_mask_dict = {}
     grouped = {}
@@ -157,8 +154,6 @@ mask_schema = StructType(
         StructField("class_masks", MapType(StringType(), BinaryType()), True),
     ]
 )
-
-# Register the UDF.
 
 
 def parse_args():
@@ -222,7 +217,7 @@ def main():
         .drop("masks")
     )
 
-    updated_df = updated_df.repartition(500)
+    updated_df = updated_df.repartition(2000)
     updated_df.write.mode("overwrite").parquet(args.output_path)
     print("Updated Parquet file written to:", args.output_path)
 
