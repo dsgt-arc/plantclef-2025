@@ -13,7 +13,7 @@ from plantclef.classification.submission import SubmissionTask
 from plantclef.spark import spark_resource
 
 
-class ProcessInference(luigi.Task):
+class ProcessClassifier(luigi.Task):
     """Task to process embeddings."""
 
     input_path = luigi.Parameter()
@@ -131,7 +131,7 @@ class Workflow(luigi.Task):
             output_path = f"{self.output_path}/{file_name}"
         tasks = []
         for sample_id in sample_ids:
-            task = ProcessInference(
+            task = ProcessClassifier(
                 input_path=self.input_path,
                 output_path=output_path,
                 cpu_count=self.cpu_count,
