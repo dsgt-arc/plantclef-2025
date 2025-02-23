@@ -8,8 +8,8 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from plantclef.model_setup import setup_fine_tuned_model
-from plantclef.inference.transform import InferenceFineTunedDINOv2
-from plantclef.inference.submission import SubmissionTask
+from plantclef.classification.transform import ClasifierFineTunedDINOv2
+from plantclef.classification.submission import SubmissionTask
 from plantclef.spark import spark_resource
 
 
@@ -42,7 +42,7 @@ class ProcessInference(luigi.Task):
     def pipeline(self):
         model = Pipeline(
             stages=[
-                InferenceFineTunedDINOv2(
+                ClasifierFineTunedDINOv2(
                     input_col="data",
                     output_col="logits",
                     model_path=self.model_path,

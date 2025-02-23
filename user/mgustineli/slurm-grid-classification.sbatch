@@ -50,7 +50,7 @@ submission_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/submissions
 dataset_name=test_2024
 
 # run Python script
-plantclef inference workflow \
+plantclef classification workflow \
     $project_data_dir/parquet/$dataset_name \
     $project_data_dir/logits/${dataset_name} \
     $submission_dir \

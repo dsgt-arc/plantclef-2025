@@ -80,7 +80,7 @@ class HasBatchSize(Param):
         return self.getOrDefault(self.batchSize)
 
 
-class InferenceFineTunedDINOv2(
+class ClasifierFineTunedDINOv2(
     Transformer,
     HasInputCol,
     HasOutputCol,
@@ -91,7 +91,7 @@ class InferenceFineTunedDINOv2(
     DefaultParamsWritable,
 ):
     """
-    Wrapper for the fine-tuned DINOv2 model for inference.
+    Wrapper for the fine-tuned DINOv2 model for classification.
     """
 
     def __init__(
@@ -181,8 +181,8 @@ class InferenceFineTunedDINOv2(
             if self.use_grid:
                 images = self._split_into_grid(img)
             results = []
-            for img in images:
-                processed_image = self.transforms(img).unsqueeze(0).to(self.device)
+            for tile in images:
+                processed_image = self.transforms(tile).unsqueeze(0).to(self.device)
                 with torch.no_grad():
                     outputs = self.model(processed_image)
                     probabilities = torch.softmax(outputs, dim=1) * 100
