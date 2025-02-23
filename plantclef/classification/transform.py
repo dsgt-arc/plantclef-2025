@@ -11,7 +11,14 @@ from pyspark.ml.param.shared import HasInputCol, HasOutputCol
 from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import ArrayType, FloatType, MapType, StringType
+from pyspark.sql.types import (
+    ArrayType,
+    FloatType,
+    MapType,
+    StringType,
+    StructType,
+    StructField,
+)
 
 
 class HasModelPath(Param):
@@ -184,16 +191,21 @@ class ClasifierFineTunedDINOv2(
             for tile in images:
                 processed_image = self.transforms(tile).unsqueeze(0).to(self.device)
                 with torch.no_grad():
+                    # extract CLS embeddings from each tile
+                    features = self.model.forward_features(processed_image)
+                    cls_token = features[:, 0, :]  # extract [CLS] token embeddings
+                    # extract logits for each tile
                     outputs = self.model(processed_image)
                     probabilities = torch.softmax(outputs, dim=1) * 100
                     top_probs, top_indices = torch.topk(probabilities, k=top_k_proba)
+                np_emb_array = cls_token.cpu().numpy()
                 top_probs = top_probs.cpu().numpy()[0]
                 top_indices = top_indices.cpu().numpy()[0]
                 result = [
                     {self.cid_to_spid.get(index, "Unknown"): float(prob)}
                     for index, prob in zip(top_indices, top_probs)
                 ]
-                results.append(result)
+                results.append({"top_k": result, "cls_embedding": np_emb_array})
             # flatten the results from all grids, get top 5 probabilities
             flattened_results = [
                 item for grid in results for item in grid[:limit_logits]
@@ -208,7 +220,18 @@ class ClasifierFineTunedDINOv2(
 
     def _transform(self, df: DataFrame):
         predict_fn = self._make_predict_fn()
-        predict_udf = F.udf(predict_fn, ArrayType(MapType(StringType(), FloatType())))
+        # predict_udf = F.udf(predict_fn, ArrayType(MapType(StringType(), FloatType())))
+        predict_udf = F.udf(
+            predict_fn,
+            ArrayType(
+                StructType(
+                    [
+                        StructField("top_k", MapType(StringType(), FloatType()), False),
+                        StructField("cls_embedding", ArrayType(FloatType()), False),
+                    ]
+                )
+            ),
+        )
         return df.withColumn(
             self.getOutputCol(), predict_udf(F.col(self.getInputCol()))
         )
