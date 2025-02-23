@@ -46,9 +46,8 @@ def image_to_bytes(image_array, ext=".png"):
 
 def process_image(binary_data):
     try:
-        # Lazy initialization: only load the models once per executor.
         if not hasattr(process_image, "initialized"):
-            HOME = Path(os.path.expanduser("~"))
+            HOME = get_home_dir()
             SAM_ENCODER_VERSION = "vit_h"
             SAM_CHECKPOINT_PATH = os.path.join(
                 HOME, "scratch/weights", "sam_vit_h_4b8939.pth"
@@ -72,7 +71,6 @@ def process_image(binary_data):
                 model_checkpoint_path=GROUNDING_DINO_CHECKPOINT_PATH,
             )
 
-            # Constants (define once per executor)
             process_image.CLASSES = [
                 "leaf",
                 "flower",
@@ -145,7 +143,6 @@ def process_image(binary_data):
             class_mask_results["plant"],
         )
     except Exception as e:
-        # Log error info to help debugging; consider writing to stderr or a log file.
         sys.stderr.write(f"Error processing image: {e}\n")
         return (None, None, None, None)
 
