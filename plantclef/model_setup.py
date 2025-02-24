@@ -95,10 +95,11 @@ def setup_groundingdino_checkpoint_path():
 
 def setup_groundingdino_config_path():
     home_dir = Path(os.path.expanduser("~"))
-    config_dir = os.path.join(home_dir, "scratch/plantclef/groundingdino/config")
-    os.makedirs(config_dir, exist_ok=True)
-    grounding_dino_config_path = os.path.join(config_dir, "GroundingDINO_SwinT_OGC.py")
-    return grounding_dino_config_path
+    config_dir = os.path.join(
+        home_dir,
+        "scratch/plantclef/Grounded-Segment-Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinB.py",
+    )
+    return config_dir
 
 
 if __name__ == "__main__":
