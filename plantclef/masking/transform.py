@@ -14,7 +14,7 @@ from plantclef.model_setup import (
 from pyspark.ml import Transformer
 from pyspark.ml.param import Param, Params, TypeConverters
 from pyspark.ml.functions import predict_batch_udf
-from pyspark.ml.param.shared import HasInputCol, HasOutputCols
+from pyspark.ml.param.shared import HasInputCol, HasOutputCol
 from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
 from pyspark.sql import DataFrame
 from pyspark.sql.types import ArrayType, FloatType
@@ -133,7 +133,7 @@ class HasBatchSize(Param):
 class WrappedMasking(
     Transformer,
     HasInputCol,
-    HasOutputCols,
+    HasOutputCol,
     HasCheckpointPathSAM,
     HasEncoderVersion,
     HasCheckpointPathGroundingDINO,
@@ -149,7 +149,7 @@ class WrappedMasking(
     def __init__(
         self,
         input_col: str = "input",
-        output_cols: list = ["leaf_mask", "flower_mask", "plant_mask", "final_mask"],
+        output_col: str = "masks",
         checkpoint_path_sam: str = setup_segment_anything_checkpoint_path(),
         checkpoint_path_groundingdino: str = setup_groundingdino_checkpoint_path(),
         config_path_groundingdino: str = setup_groundingdino_config_path(),
@@ -159,7 +159,7 @@ class WrappedMasking(
         super().__init__()
         self._setDefault(
             inputCol=input_col,
-            outputCols=output_cols,
+            outputCol=output_col,
             checkpointPathSAM=checkpoint_path_sam,
             encoderVersion=encoder_version,
             checkpointPathGroundingDINO=checkpoint_path_groundingdino,
@@ -239,69 +239,73 @@ class WrappedMasking(
         self._nvidia_smi()
 
         def predict(inputs: np.ndarray) -> np.ndarray:
-            nparr = np.frombuffer(inputs, np.uint8)
-            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            results = []
+            for img in inputs:
+                nparr = np.frombuffer(img, np.uint8)
+                image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-            detections = self.groundingdino_model.predict_with_classes(
-                image=image,
-                classes=self.enhance_class_name(class_names=self.CLASSES),
-                BOX_THRESHOLD=self.BOX_THRESHOLD,
-                TEXT_THRESHOLD=self.TEXT_THRESHOLD,
-            )
+                detections = self.groundingdino_model.predict_with_classes(
+                    image=image,
+                    classes=self.enhance_class_name(class_names=self.CLASSES),
+                    box_threshold=self.BOX_THRESHOLD,
+                    text_threshold=self.TEXT_THRESHOLD,
+                )
 
-            # Generate masks
-            detections.mask = self.segment(
-                sam_predictor=self.sam_predictor,
-                image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
-                xyxy=detections.xyxy,
-            )
+                # Generate masks
+                detections.mask = self.segment(
+                    sam_predictor=self.sam_predictor,
+                    image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
+                    xyxy=detections.xyxy,
+                )
 
-            merged_masks = []
-            class_mask_results = {"leaf": None, "flower": None, "plant": None}
-            grouped = {}
-            for mask, class_id in zip(detections.mask, detections.class_id):
-                grouped.setdefault(class_id, []).append(mask)
+                merged_masks = []
+                class_mask_results = {"leaf": None, "flower": None, "plant": None}
+                grouped = {}
+                for mask, class_id in zip(detections.mask, detections.class_id):
+                    grouped.setdefault(class_id, []).append(mask)
 
-            for class_id, masks in grouped.items():
-                if class_id in self.INCLUDE_CLASS_IDS and len(masks) > 0:
-                    merged_mask = np.any(np.stack(masks, axis=0), axis=0)
-                    merged_masks.append(merged_mask)
-                    mask_uint8 = (merged_mask.astype(np.uint8)) * 255
-                    if self.CLASSES[class_id] in class_mask_results:
-                        class_mask_results[self.CLASSES[class_id]] = (
-                            self.image_to_bytes(mask_uint8, ext=".png")
-                        )
+                for class_id, masks in grouped.items():
+                    if class_id in self.INCLUDE_CLASS_IDS and len(masks) > 0:
+                        merged_mask = np.any(np.stack(masks, axis=0), axis=0)
+                        merged_masks.append(merged_mask)
+                        mask_uint8 = (merged_mask.astype(np.uint8)) * 255
+                        if self.CLASSES[class_id] in class_mask_results:
+                            class_mask_results[self.CLASSES[class_id]] = (
+                                self.image_to_bytes(mask_uint8, ext=".png")
+                            )
 
-            if merged_masks:
-                final_mask = np.any(np.stack(merged_masks, axis=0), axis=0)
-                final_mask_uint8 = (final_mask.astype(np.uint8)) * 255
-                final_mask_bytes = self.image_to_bytes(final_mask_uint8, ext=".png")
-            else:
-                final_mask_bytes = None
+                if merged_masks:
+                    final_mask = np.any(np.stack(merged_masks, axis=0), axis=0)
+                    final_mask_uint8 = (final_mask.astype(np.uint8)) * 255
+                    final_mask_bytes = self.image_to_bytes(final_mask_uint8, ext=".png")
+                else:
+                    final_mask_bytes = None
 
-            return (
-                final_mask_bytes,
-                class_mask_results["leaf"],
-                class_mask_results["flower"],
-                class_mask_results["plant"],
-            )
+                results.append(
+                    (
+                        final_mask_bytes,
+                        class_mask_results["leaf"],
+                        class_mask_results["flower"],
+                        class_mask_results["plant"],
+                    )
+                )
+            return np.array(results)
 
         return predict
 
     def _transform(self, df: DataFrame):
+        # Assuming your UDF now returns a struct with fields "leaf_mask", "flower_mask", "plant_mask", "final_mask"
         return df.withColumn(
-            self.getOutputCols(),
+            self.getOutputCol(),  # a single column name
             predict_batch_udf(
                 make_predict_fn=self._make_predict_fn,
-                return_type=ArrayType(
-                    StructType(
-                        [
-                            StructField("leaf_mask", ArrayType(FloatType()), False),
-                            StructField("flower_mask", ArrayType(FloatType()), False),
-                            StructField("plant_mask", ArrayType(FloatType()), False),
-                            StructField("final_mask", ArrayType(FloatType()), False),
-                        ]
-                    )
+                return_type=StructType(
+                    [
+                        StructField("leaf_mask", ArrayType(FloatType()), False),
+                        StructField("flower_mask", ArrayType(FloatType()), False),
+                        StructField("plant_mask", ArrayType(FloatType()), False),
+                        StructField("final_mask", ArrayType(FloatType()), False),
+                    ]
                 ),
                 batch_size=self.getBatchSize(),
             )(self.getInputCol()),

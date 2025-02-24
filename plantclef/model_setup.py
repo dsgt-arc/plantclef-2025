@@ -97,7 +97,7 @@ def setup_groundingdino_config_path():
     home_dir = Path(os.path.expanduser("~"))
     config_dir = os.path.join(
         home_dir,
-        "scratch/plantclef/Grounded-Segment-Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinB.py",
+        "scratch/plantclef/Grounded-Segment-Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py",
     )
     return config_dir
 
