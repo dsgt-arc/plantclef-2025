@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import requests
 
 
 def get_model_dir() -> str:
@@ -50,30 +51,53 @@ def setup_fine_tuned_model(
     return full_model_path
 
 
+def download_file(url, dest_path):
+    response = requests.get(url, stream=True)
+    response.raise_for_status()  # Ensure the download was successful
+    with open(dest_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:  # filter out keep-alive new chunks
+                f.write(chunk)
+    print(f"Downloaded {url} to {dest_path}")
+
+
 def setup_segment_anything_checkpoint_path():
     home_dir = Path(os.path.expanduser("~"))
-    sam_checkpoint_path = os.path.join(
-        home_dir, "scratch/plantclef/SAM_checkpoint/weights", "sam_vit_h_4b8939.pth"
-    )
+    checkpoint_dir = os.path.join(home_dir, "scratch/plantclef/SAM_checkpoint/weights")
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    sam_checkpoint_path = os.path.join(checkpoint_dir, "sam_vit_h_4b8939.pth")
+
+    if not os.path.exists(sam_checkpoint_path):
+        sam_url = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth"
+        print("SAM checkpoint not found. Downloading...")
+        download_file(sam_url, sam_checkpoint_path)
+
     return sam_checkpoint_path
 
 
 def setup_groundingdino_checkpoint_path():
     home_dir = Path(os.path.expanduser("~"))
-    grounding_dino_checkpoint_path = os.path.join(
-        home_dir,
-        "scratch/plantclef/groundingdino/checkpoint/weights",
-        "groundingdino_swint_ogc.pth",
+    checkpoint_dir = os.path.join(
+        home_dir, "scratch/plantclef/groundingdino/checkpoint/weights"
     )
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    grounding_dino_checkpoint_path = os.path.join(
+        checkpoint_dir, "groundingdino_swint_ogc.pth"
+    )
+
+    if not os.path.exists(grounding_dino_checkpoint_path):
+        groundingdino_url = "https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha/groundingdino_swint_ogc.pth"
+        print("GroundingDINO checkpoint not found. Downloading...")
+        download_file(groundingdino_url, grounding_dino_checkpoint_path)
+
     return grounding_dino_checkpoint_path
 
 
 def setup_groundingdino_config_path():
     home_dir = Path(os.path.expanduser("~"))
-    grounding_dino_config_path = os.path.join(
-        home_dir,
-        "scratch/plantclef/groundingdino/config/GroundingDINO_SwinT_OGC.py",
-    )
+    config_dir = os.path.join(home_dir, "scratch/plantclef/groundingdino/config")
+    os.makedirs(config_dir, exist_ok=True)
+    grounding_dino_config_path = os.path.join(config_dir, "GroundingDINO_SwinT_OGC.py")
     return grounding_dino_config_path
 
 
