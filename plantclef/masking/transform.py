@@ -14,7 +14,7 @@ from plantclef.model_setup import (
 from pyspark.ml import Transformer
 from pyspark.ml.param import Param, Params, TypeConverters
 from pyspark.ml.functions import predict_batch_udf
-from pyspark.ml.param.shared import HasInputCol, HasOutputCol
+from pyspark.ml.param.shared import HasInputCol, HasOutputCols
 from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
 from pyspark.sql import DataFrame
 from pyspark.sql.types import ArrayType, FloatType
@@ -25,9 +25,9 @@ class HasCheckpointPathSAM(Param):
     Mixin for param checkpoint_path: str
     """
 
-    checkpointPath = Param(
+    checkpointPathSAM = Param(
         Params._dummy(),
-        "checkpointPath",
+        "checkpointPathSAM",
         "The path to the segment-anything checkpoint weights",
         typeConverter=TypeConverters.toString,
     )
@@ -39,7 +39,7 @@ class HasCheckpointPathSAM(Param):
         )
 
     def getCheckpointPathSAM(self) -> str:
-        return self.getOrDefault(self.checkpointPath)
+        return self.getOrDefault(self.checkpointPathSAM)
 
 
 class HasEncoderVersion(Param):
@@ -69,7 +69,7 @@ class HasCheckpointPathGroundingDINO(Param):
     Mixin for param checkpoint_path_groundingdino: str
     """
 
-    checkpointPath = Param(
+    checkpointPathGroundingDINO = Param(
         Params._dummy(),
         "checkpointPathGroundingDINO",
         "The path to the GroundingDINO checkpoint weights",
@@ -83,7 +83,7 @@ class HasCheckpointPathGroundingDINO(Param):
         )
 
     def getCheckpointPathGroundingDINO(self) -> str:
-        return self.getOrDefault(self.checkpointPath)
+        return self.getOrDefault(self.checkpointPathGroundingDINO)
 
 
 class HasConfigPathGroundingDINO(Param):
@@ -91,21 +91,21 @@ class HasConfigPathGroundingDINO(Param):
     Mixin for param config_path_groundingdino: str
     """
 
-    configPath = Param(
+    configPathGroundingDINO = Param(
         Params._dummy(),
-        "configPath",
+        "configPathGroundingDINO",
         "The path to the GroundingDINO config path",
         typeConverter=TypeConverters.toString,
     )
 
     def __init__(self):
         super().__init__(
-            default=setup_groundingdino_checkpoint_path(),
+            default=setup_groundingdino_config_path(),
             doc="The path to the GroundingDINO config path",
         )
 
     def getConfigPathGroundingDINO(self) -> str:
-        return self.getOrDefault(self.configPath)
+        return self.getOrDefault(self.configPathGroundingDINO)
 
 
 class HasBatchSize(Param):
@@ -133,9 +133,11 @@ class HasBatchSize(Param):
 class WrappedMasking(
     Transformer,
     HasInputCol,
-    HasOutputCol,
+    HasOutputCols,
     HasCheckpointPathSAM,
     HasEncoderVersion,
+    HasCheckpointPathGroundingDINO,
+    HasConfigPathGroundingDINO,
     HasBatchSize,
     DefaultParamsReadable,
     DefaultParamsWritable,
@@ -157,11 +159,11 @@ class WrappedMasking(
         super().__init__()
         self._setDefault(
             inputCol=input_col,
-            outputCol=output_cols,
+            outputCols=output_cols,
             checkpointPathSAM=checkpoint_path_sam,
+            encoderVersion=encoder_version,
             checkpointPathGroundingDINO=checkpoint_path_groundingdino,
             configPathGroundingDINO=config_path_groundingdino,
-            encoderVersion=encoder_version,
             batchSize=batch_size,
         )
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -288,7 +290,7 @@ class WrappedMasking(
 
     def _transform(self, df: DataFrame):
         return df.withColumn(
-            self.getOutputCol(),
+            self.getOutputCols(),
             predict_batch_udf(
                 make_predict_fn=self._make_predict_fn,
                 return_type=ArrayType(

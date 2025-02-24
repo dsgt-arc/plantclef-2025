@@ -36,10 +36,10 @@ def spark_df(spark):
 def test_wrapped_finetuned_dinov2(spark_df, encoder_version, expected_dim):
     model = WrappedMasking(
         input_col="img",
-        output_col=["leaf_mask", "flower_mask", "plant_mask", "final_mask"],
+        output_cols=["leaf_mask", "flower_mask", "plant_mask", "final_mask"],
         checkpoint_path_sam=setup_segment_anything_checkpoint_path(),
         checkpoint_path_groundingdino=setup_groundingdino_checkpoint_path(),
-        config_path_groundingding=setup_groundingdino_config_path(),
+        config_path_groundingdino=setup_groundingdino_config_path(),
         encoder_version="vit_h",
         batch_size=2,
     )
