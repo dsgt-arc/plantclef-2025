@@ -50,7 +50,46 @@ def setup_fine_tuned_model(
     return full_model_path
 
 
+def setup_segment_anything_checkpoint_path():
+    home_dir = Path(os.path.expanduser("~"))
+    sam_checkpoint_path = os.path.join(
+        home_dir, "scratch/plantclef/SAM_checkpoint/weights", "sam_vit_h_4b8939.pth"
+    )
+    return sam_checkpoint_path
+
+
+def setup_groundingdino_checkpoint_path():
+    home_dir = Path(os.path.expanduser("~"))
+    grounding_dino_checkpoint_path = os.path.join(
+        home_dir,
+        "scratch/plantclef/groundingdino/checkpoint/weights",
+        "groundingdino_swint_ogc.pth",
+    )
+    return grounding_dino_checkpoint_path
+
+
+def setup_groundingdino_config_path():
+    home_dir = Path(os.path.expanduser("~"))
+    grounding_dino_config_path = os.path.join(
+        home_dir,
+        "scratch/plantclef/groundingdino/config/GroundingDINO_SwinT_OGC.py",
+    )
+    return grounding_dino_config_path
+
+
 if __name__ == "__main__":
     # Get model
-    model_path = setup_fine_tuned_model()
-    print("Model path:", model_path)
+    dino_model_path = setup_fine_tuned_model()
+    print("Model path:", dino_model_path)
+
+    # Get SAM checkpoint path
+    sam_checkpoint_path = setup_segment_anything_checkpoint_path()
+    print("SAM checkpoint path:", sam_checkpoint_path)
+
+    # Get GroundingDINO checkpoint path
+    grounding_dino_checkpoint_path = setup_groundingdino_checkpoint_path()
+    print("GroundingDINO checkpoint path:", grounding_dino_checkpoint_path)
+
+    # Get GroundingDINO config path
+    grounding_dino_config_path = setup_groundingdino_config_path()
+    print("GroundingDINO config path:", grounding_dino_config_path)

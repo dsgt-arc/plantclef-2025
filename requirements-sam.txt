@@ -1,0 +1,28 @@
+numpy<2
+pandas
+matplotlib
+scikit-learn
+tqdm
+pyspark >= 3.4.0
+pyarrow
+luigi
+aria2
+# torch
+# torchvision
+# torchaudio
+Cython==3.0.12
+timm
+transformers
+typer
+opencv-python
+pycocotools
+onnxruntime
+onnx
+ipykernel
+
+# developer tools
+jupyterlab
+ruff
+pre-commit
+pytest
+xmltodict
