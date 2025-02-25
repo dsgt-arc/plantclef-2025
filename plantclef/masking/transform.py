@@ -148,7 +148,7 @@ class WrappedMasking(
 
     def __init__(
         self,
-        input_col: str = "input",
+        input_col: str = "data",
         output_col: str = "masks",
         checkpoint_path_sam: str = setup_segment_anything_checkpoint_path(),
         checkpoint_path_groundingdino: str = setup_groundingdino_checkpoint_path(),
@@ -290,9 +290,11 @@ class WrappedMasking(
             )
 
             return {
-                "combined_mask": final_mask_bytes
-                if final_mask_bytes is not None
-                else self.empty_png(image_np.shape[:2]),
+                "combined_mask": (
+                    final_mask_bytes
+                    if final_mask_bytes is not None
+                    else self.empty_png(image_np.shape[:2])
+                ),
                 "leaf_mask": class_mask_results.get("leaf")
                 or self.empty_png(image_np.shape[:2]),
                 "flower_mask": class_mask_results.get("flower")

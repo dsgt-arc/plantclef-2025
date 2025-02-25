@@ -7,12 +7,16 @@ from pyspark.ml.functions import vector_to_array
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from plantclef.embedding.transform import WrappedFineTunedDINOv2
+from plantclef.masking.transform import WrappedMasking
 from plantclef.spark import spark_resource
-from plantclef.model_setup import setup_fine_tuned_model
+from plantclef.model_setup import (
+    setup_segment_anything_checkpoint_path,
+    setup_groundingdino_checkpoint_path,
+    setup_groundingdino_config_path,
+)
 
 
-class ProcessEmbeddings(luigi.Task):
+class ProcessMasks(luigi.Task):
     """Task to process embeddings."""
 
     input_path = luigi.Parameter()
@@ -29,8 +33,16 @@ class ProcessEmbeddings(luigi.Task):
     sql_statement = luigi.Parameter(
         default="SELECT image_name, species_id, cls_embedding FROM __THIS__"
     )
-    model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
-    model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
+    checkpoint_path_sam = luigi.Parameter(
+        default=setup_segment_anything_checkpoint_path()
+    )
+    checkpoint_path_groundingdino = luigi.Parameter(
+        default=setup_groundingdino_checkpoint_path()
+    )
+    config_path_groundingdino = luigi.Parameter(
+        default=setup_groundingdino_config_path()
+    )
+    encoder_version = luigi.Parameter(default="vit_h")
 
     def output(self):
         # write a partitioned dataset to disk
@@ -41,11 +53,13 @@ class ProcessEmbeddings(luigi.Task):
     def pipeline(self):
         model = Pipeline(
             stages=[
-                WrappedFineTunedDINOv2(
+                WrappedMasking(
                     input_col="data",
-                    output_col="cls_embedding",
-                    model_path=self.model_path,
-                    model_name=self.model_name,
+                    output_col="masks",
+                    checkpoint_path_sam=self.checkpoint_path_sam,
+                    checkpoint_path_groundingdino=self.checkpoint_path_groundingdino,
+                    config_path_groundingdino=self.config_path_groundingdino,
+                    encoder_version=self.encoder_version,
                     batch_size=self.batch_size,
                 ),
                 SQLTransformer(statement=self.sql_statement),
@@ -55,7 +69,7 @@ class ProcessEmbeddings(luigi.Task):
 
     @property
     def feature_columns(self) -> list:
-        return ["cls_embedding"]
+        return ["masks"]
 
     def transform(self, model, df, features) -> DataFrame:
         transformed = model.transform(df)
@@ -90,8 +104,16 @@ class ProcessEmbeddings(luigi.Task):
             # transform the dataframe and write to disk
             transformed = self.transform(pipeline_model, df, self.feature_columns)
 
+            transformed = (
+                transformed.withColumn("combined_mask", F.col("masks.combined_mask"))
+                .withColumn("leaf_mask", F.col("masks.leaf_mask"))
+                .withColumn("flower_mask", F.col("masks.flower_mask"))
+                .withColumn("plant_mask", F.col("masks.plant_mask"))
+                .drop("masks")
+            )
             transformed.printSchema()
             transformed.explain()
+            # write dataframe to disk
             (
                 transformed.repartition(self.num_partitions)
                 .write.mode("overwrite")
@@ -119,7 +141,7 @@ class Workflow(luigi.WrapperTask):
 
         tasks = []
         for sample_id in sample_ids:
-            task = ProcessEmbeddings(
+            task = ProcessMasks(
                 input_path=self.input_path,
                 output_path=self.output_path,
                 cpu_count=self.cpu_count,
