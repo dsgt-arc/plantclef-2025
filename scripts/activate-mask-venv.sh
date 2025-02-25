@@ -23,7 +23,7 @@ XDG_CACHE_HOME="$HOME/scratch/.cache"
 export XDG_CACHE_HOME
 
 # Source the SLURM virtual environment setup script
-SLURM_VENV_SCRIPT="$SCRIPT_PARENT_ROOT/utils/slurm-venv.sh"
+SLURM_VENV_SCRIPT="$SCRIPT_PARENT_ROOT/utils/slurm-mask-venv.sh"
 if [[ -f "$SLURM_VENV_SCRIPT" ]]; then
     source "$SLURM_VENV_SCRIPT"
 else
