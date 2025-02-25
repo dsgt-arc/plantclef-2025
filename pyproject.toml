@@ -1,5 +1,5 @@
 [project]
-    name = "plantclef"
+name = "plantclef"
 version = "0.1.1"
 authors = [{ name = "Murilo Gustineli", email = "murilogustineli@gatech.edu" }]
 description = "DS@GT PlantCLEF 2025 helper package"
