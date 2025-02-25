@@ -14,6 +14,12 @@ parser.add_argument(
     action="store_true",
     help="Request a GPU.",
 )
+parser.add_argument(
+    "--dry-run",
+    action="store_true",
+    help="Print the command without executing it.",
+    default=True,
+)
 args = parser.parse_args()
 
 # salloc -A paceship-dsgt_clef2025 -N1 -n1 -c2 --mem-per-cpu=4G -t1:00:00
@@ -31,4 +37,7 @@ if args.gpu:
 cmd += ["--mem-per-gpu=32G" if args.gpu else "--mem-per-cpu=4G"]
 cmd = " ".join(cmd)
 print(cmd)
-subprocess.run(cmd, shell=True)
+if not args.dry_run:
+    subprocess.run(cmd, shell=True)
+else:
+    print("Dry run: command not executed.")
