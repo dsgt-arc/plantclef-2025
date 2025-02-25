@@ -8,8 +8,8 @@ set -e
 export PATH=/storage/coda1/p-dsgt_clef2025/0/shared/bin:$PATH
 
 # Define the project and scratch directories
-project_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data/embeddings
-scratch_dir=$(realpath ~/scratch/plantclef/data/embeddings)
+project_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
+scratch_dir=$(realpath ~/scratch/plantclef/data)
 
 # Remove any trailing slash from the prefix argument
 prefix=${1%/}
@@ -22,3 +22,6 @@ fi
 
 # Now copy directories from scratch into project
 rclone sync -v --progress --transfers 12 $scratch_dir/$prefix/ $project_dir/$prefix
+
+# Set permissions on the project directory
+chmod -R 777 $project_dir/$prefix
