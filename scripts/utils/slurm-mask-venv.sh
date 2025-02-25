@@ -15,12 +15,11 @@ VENV_PARENT_ROOT="${1:-$HOME/scratch/plantclef}"
 VENV_PARENT_ROOT="$(realpath "$VENV_PARENT_ROOT")"
 
 # Load the required Python and CUDA modules
-module load python/3.11
-module load cuda/12.6.1
-
+module load python/3.10
+module load cuda/11.8
 # Set CPATH to include Python’s include directory
-PYTHON_ROOT=$(python -c 'import sys; print(sys.base_prefix)')
-export CPATH="${PYTHON_ROOT}/include/python3.11:${CPATH:-}"
+export PYTHON_ROOT=$(python -c 'import sys; print(sys.base_prefix)')
+export CPATH="${PYTHON_ROOT}/include/python3.10:${CPATH:-}"
 
 # Ensure pip is installed and upgrade pip
 python -m ensurepip
