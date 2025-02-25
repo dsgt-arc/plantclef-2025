@@ -1,4 +1,3 @@
-import os
 import pytest
 from pathlib import Path
 from plantclef.spark import get_spark
@@ -15,13 +14,11 @@ from plantclef.model_setup import (
 def spark_df():
     spark = get_spark(cores=6, memory="16g", app_name="pytest")
     # image path
-    home_dir = Path(os.path.expanduser("~"))
-    image_path = "clef/plantclef-2025/tests/images/CBN-can-A1-20230705.jpg"
-    image_base_path = Path(f"{home_dir}/{image_path}")
+    image_path = Path(__file__).parent / "images/CBN-can-A1-20230705.jpg"
     # dataframe with a single image column
     image_df = (
         spark.read.format("binaryFile")
-        .load(image_base_path.as_posix())
+        .load(image_path.as_posix())
         .withColumnRenamed("content", "img")
     )
     image_df.printSchema()
@@ -34,14 +31,14 @@ def spark_df():
         "vit_h",  # Adjust output dim if needed
     ],
 )
-def test_wrapped_finetuned_dinov2(spark_df, encoder_version):
+def test_wrapped_mask(spark_df, encoder_version):
     model = WrappedMasking(
         input_col="img",
         output_col="masks",
         checkpoint_path_sam=setup_segment_anything_checkpoint_path(),
         checkpoint_path_groundingdino=setup_groundingdino_checkpoint_path(),
         config_path_groundingdino=setup_groundingdino_config_path(),
-        encoder_version="vit_h",
+        encoder_version=encoder_version,
         batch_size=2,
     )
     transformed = model.transform(spark_df).cache()
