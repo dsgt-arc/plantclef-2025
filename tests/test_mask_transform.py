@@ -1,7 +1,6 @@
-import io
+import os
 import pytest
-from PIL import Image
-from pyspark.sql import Row
+from pathlib import Path
 from plantclef.spark import get_spark
 
 from plantclef.masking.transform import WrappedMasking
@@ -14,19 +13,19 @@ from plantclef.model_setup import (
 
 @pytest.fixture
 def spark_df():
-    spark = get_spark(cores=6, name="pytest")
-    # generate a small dummy image(RGB, 32X32) for testing
-    img = Image.new("RGB", (32, 32), color="blue")
-    img_bytes = io.BytesIO()
-    img.save(img_bytes, format="JPEG")
-    img_bytes = img_bytes.getvalue()
+    spark = get_spark(cores=6, memory="16g", app_name="pytest")
+    # image path
+    home_dir = Path(os.path.expanduser("~"))
+    image_path = "clef/plantclef-2025/tests/images/CBN-can-A1-20230705.jpg"
+    image_base_path = Path(f"{home_dir}/{image_path}")
     # dataframe with a single image column
-    return spark.createDataFrame(
-        [
-            Row(img=img_bytes),
-            Row(img=img_bytes),
-        ]
+    image_df = (
+        spark.read.format("binaryFile")
+        .load(image_base_path.as_posix())
+        .withColumnRenamed("content", "img")
     )
+    image_df.printSchema()
+    return image_df
 
 
 @pytest.mark.parametrize(
@@ -50,7 +49,7 @@ def test_wrapped_finetuned_dinov2(spark_df, encoder_version):
     transformed.show()
 
     transformed.count()
-    assert transformed.count() == 2
+    assert transformed.count() == 1
     assert transformed.columns == "masks"
 
     row = transformed.select("plant_mask").first()

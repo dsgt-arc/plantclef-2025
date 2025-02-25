@@ -1,6 +1,7 @@
-import cv2
+import io
 import numpy as np
 import torch
+from PIL import Image
 from segment_anything import SamPredictor, sam_model_registry
 from groundingdino.util.inference import Model
 from typing import List
@@ -225,11 +226,15 @@ class WrappedMasking(
     def enhance_class_name(self, class_names: List[str]) -> List[str]:
         return [f"all {class_name}s" for class_name in class_names]
 
-    def image_to_bytes(self, image_array, ext=".png"):
-        success, buffer = cv2.imencode(ext, image_array)
-        if not success:
-            raise ValueError("Image encoding failed!")
-        return buffer.tobytes()
+    def mask_to_bytes(self, image_array):
+        # convert ndarray to image
+        mask_uint8 = image_array.astype("uint8")
+        img = Image.fromarray(mask_uint8, mode="L")
+        img_bytes = io.BytesIO()
+        # save image as PNG
+        img.save(img_bytes, format="PNG")
+        img_bytes = img_bytes.getvalue()
+        return img_bytes
 
     def _make_predict_fn(self):
         """Return PredictBatchFunction using a closure over the model"""
@@ -237,12 +242,13 @@ class WrappedMasking(
         # check on the nvidia stats when generating the predict function
         self._nvidia_smi()
 
-        def predict(inputs: np.ndarray) -> np.ndarray:
-            nparr = np.frombuffer(inputs, np.uint8)
-            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        def predict(input_image: np.ndarray) -> np.ndarray:
+            # convert binary to RGB
+            pil_image = Image.open(io.BytesIO(input_image)).convert("RGB")
+            image_np = np.array(pil_image)
 
             detections = self.groundingdino_model.predict_with_classes(
-                image=image,
+                image=image_np,
                 classes=self.enhance_class_name(class_names=self.CLASSES),
                 box_threshold=self.BOX_THRESHOLD,
                 text_threshold=self.TEXT_THRESHOLD,
@@ -251,7 +257,7 @@ class WrappedMasking(
             # Generate masks
             detections.mask = self.segment(
                 sam_predictor=self.sam_predictor,
-                image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
+                image=image_np,
                 xyxy=detections.xyxy,
             )
 
@@ -265,25 +271,23 @@ class WrappedMasking(
                 if class_id in self.INCLUDE_CLASS_IDS and len(masks) > 0:
                     merged_mask = np.any(np.stack(masks, axis=0), axis=0)
                     merged_masks.append(merged_mask)
-                    mask_uint8 = (merged_mask.astype(np.uint8)) * 255
-                    if self.CLASSES[class_id] in class_mask_results:
-                        class_mask_results[self.CLASSES[class_id]] = (
-                            self.image_to_bytes(mask_uint8, ext=".png")
-                        )
+                    for image_mask in merged_masks:
+                        # mask_uint8 = (merged_mask.astype(np.uint8)) * 255
+                        if self.CLASSES[class_id] in class_mask_results:
+                            class_mask_results[self.CLASSES[class_id]] = (
+                                self.mask_to_bytes(image_mask)
+                            )
 
-            if merged_masks:
-                final_mask = np.any(np.stack(merged_masks, axis=0), axis=0)
-                final_mask_uint8 = (final_mask.astype(np.uint8)) * 255
-                final_mask_bytes = self.image_to_bytes(final_mask_uint8, ext=".png")
-            else:
-                final_mask_bytes = None
-
-            return (
-                final_mask_bytes,
-                class_mask_results["leaf"],
-                class_mask_results["flower"],
-                class_mask_results["plant"],
+            final_mask = np.any(np.stack(merged_masks, axis=0), axis=0)
+            # final_mask_uint8 = (final_mask.astype(np.uint8)) * 255
+            final_mask_bytes = self.mask_to_bytes(
+                final_mask,
             )
+
+            return {
+                "final_mask": final_mask_bytes,
+                **class_mask_results,
+            }
 
         return predict
 
