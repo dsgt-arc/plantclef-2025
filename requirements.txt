@@ -1,4 +1,4 @@
-numpy
+numpy < 2
 pandas
 matplotlib
 scikit-learn
@@ -12,6 +12,7 @@ timm
 transformers
 typer
 opencv-python
+faiss-gpu
 
 # developer tools
 jupyterlab
