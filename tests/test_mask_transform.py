@@ -12,7 +12,7 @@ from plantclef.model_setup import (
 
 @pytest.fixture
 def spark_df():
-    spark = get_spark(cores=6, memory="16g", app_name="pytest")
+    spark = get_spark(cores=2, memory="16g", app_name="pytest")
     # image path
     image_path = Path(__file__).parent / "images/CBN-can-A1-20230705.jpg"
     # dataframe with a single image column
@@ -28,7 +28,7 @@ def spark_df():
 @pytest.mark.parametrize(
     "encoder_version",
     [
-        "vit_h",  # Adjust output dim if needed
+        "vit_h",
     ],
 )
 def test_wrapped_mask(spark_df, encoder_version):
@@ -39,7 +39,7 @@ def test_wrapped_mask(spark_df, encoder_version):
         checkpoint_path_groundingdino=setup_groundingdino_checkpoint_path(),
         config_path_groundingdino=setup_groundingdino_config_path(),
         encoder_version=encoder_version,
-        batch_size=2,
+        batch_size=1,
     )
     transformed = model.transform(spark_df).cache()
     transformed.printSchema()
@@ -49,7 +49,7 @@ def test_wrapped_mask(spark_df, encoder_version):
     assert transformed.count() == 1
     assert transformed.columns == "masks"
 
-    row = transformed.select("plant_mask").first()
+    row = transformed.select("masks").first()
     assert isinstance(row.transformed, list)
     # assert len(row.transformed) == expected_dim
     assert all(isinstance(x, float) for x in row.transformed)
