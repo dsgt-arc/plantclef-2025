@@ -17,7 +17,7 @@ from pyspark.ml.param.shared import HasInputCol, HasOutputCol
 from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import ArrayType, FloatType, StructType, StructField
+from pyspark.sql.types import StructType, StructField, BinaryType
 
 
 class HasCheckpointPathSAM(Param):
@@ -236,6 +236,11 @@ class WrappedMasking(
         img_bytes = img_bytes.getvalue()
         return img_bytes
 
+    def empty_png(self, shape):
+        # Create an empty image (all zeros) of the given shape.
+        empty_array = np.zeros(shape, dtype=np.uint8)
+        return self.mask_to_bytes(empty_array)
+
     def _make_predict_fn(self):
         """Return PredictBatchFunction using a closure over the model"""
 
@@ -285,8 +290,15 @@ class WrappedMasking(
             )
 
             return {
-                "final_mask": final_mask_bytes,
-                **class_mask_results,
+                "combined_mask": final_mask_bytes
+                if final_mask_bytes is not None
+                else self.empty_png(image_np.shape[:2]),
+                "leaf_mask": class_mask_results.get("leaf")
+                or self.empty_png(image_np.shape[:2]),
+                "flower_mask": class_mask_results.get("flower")
+                or self.empty_png(image_np.shape[:2]),
+                "plant_mask": class_mask_results.get("plant")
+                or self.empty_png(image_np.shape[:2]),
             }
 
         return predict
@@ -297,10 +309,10 @@ class WrappedMasking(
             predict_fn,
             StructType(
                 [
-                    StructField("leaf_mask", ArrayType(FloatType()), False),
-                    StructField("flower_mask", ArrayType(FloatType()), False),
-                    StructField("plant_mask", ArrayType(FloatType()), False),
-                    StructField("final_mask", ArrayType(FloatType()), False),
+                    StructField("combined_mask", BinaryType(), False),
+                    StructField("leaf_mask", BinaryType(), False),
+                    StructField("flower_mask", BinaryType(), False),
+                    StructField("plant_mask", BinaryType(), False),
                 ]
             ),
         )

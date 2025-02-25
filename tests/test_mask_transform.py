@@ -22,6 +22,7 @@ def spark_df():
         .withColumnRenamed("content", "img")
     )
     image_df.printSchema()
+    image_df = image_df.select("img")
     return image_df
 
 
@@ -44,12 +45,10 @@ def test_wrapped_mask(spark_df, encoder_version):
     transformed = model.transform(spark_df).cache()
     transformed.printSchema()
     transformed.show()
-
     transformed.count()
+
     assert transformed.count() == 1
-    assert transformed.columns == "masks"
+    assert "masks" in transformed.columns
 
     row = transformed.select("masks").first()
-    assert isinstance(row.transformed, list)
-    # assert len(row.transformed) == expected_dim
-    assert all(isinstance(x, float) for x in row.transformed)
+    assert isinstance(row.masks["combined_mask"], (bytes, bytearray))
