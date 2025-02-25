@@ -19,6 +19,9 @@ PYTEST_DEBUG_TEMPROOT="$HOME/scratch/pytest-tmp"
 mkdir -p "$PYTEST_DEBUG_TEMPROOT"
 export PYTEST_DEBUG_TEMPROOT
 
+XDG_CACHE_HOME="$HOME/scratch/.cache"
+export XDG_CACHE_HOME
+
 # Source the SLURM virtual environment setup script
 SLURM_VENV_SCRIPT="$SCRIPT_PARENT_ROOT/utils/slurm-venv.sh"
 if [[ -f "$SLURM_VENV_SCRIPT" ]]; then
