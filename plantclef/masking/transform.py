@@ -181,18 +181,18 @@ class WrappedMasking(
         self.CLASSES = [
             "leaf",
             "flower",
+            "plant",
             "sand",
             "wood",
             "stone",
             "tape",
-            "plant",
             "tree",
             "rock",
             "vegetation",
         ]
         self.BOX_THRESHOLD = 0.15
         self.TEXT_THRESHOLD = 0.1
-        self.INCLUDE_CLASS_IDS = {0, 1, 6}
+        self.INCLUDE_CLASS_IDS = {0, 1, 2}
         self.INITIALIZED = True
 
     def _nvidia_smi(self):
@@ -224,17 +224,18 @@ class WrappedMasking(
         return np.array(result_masks)
 
     def enhance_class_name(self, class_names: List[str]) -> List[str]:
-        return [f"all {class_name}s" for class_name in class_names]
+        return [f"all {class_name}" for class_name in class_names]
 
     def mask_to_bytes(self, image_array):
-        # convert ndarray to image
-        mask_uint8 = image_array.astype("uint8")
+        # ensure the input is uint8 (0-255)
+        mask_uint8 = np.clip(image_array, 0, 255).astype(np.uint8)
+        # convert to grayscale image
         img = Image.fromarray(mask_uint8, mode="L")
-        img_bytes = io.BytesIO()
-        # save image as PNG
-        img.save(img_bytes, format="PNG")
-        img_bytes = img_bytes.getvalue()
-        return img_bytes
+        # save as PNG to a bytes buffer
+        img_bytes_io = io.BytesIO()
+        img.save(img_bytes_io, format="PNG")
+        # retrieve bytes and return
+        return img_bytes_io.getvalue()
 
     def empty_png(self, shape):
         # Create an empty image (all zeros) of the given shape.
@@ -252,6 +253,7 @@ class WrappedMasking(
             pil_image = Image.open(io.BytesIO(input_image)).convert("RGB")
             image_np = np.array(pil_image)
 
+            # predict with groundingdino
             detections = self.groundingdino_model.predict_with_classes(
                 image=image_np,
                 classes=self.enhance_class_name(class_names=self.CLASSES),
@@ -259,7 +261,7 @@ class WrappedMasking(
                 text_threshold=self.TEXT_THRESHOLD,
             )
 
-            # Generate masks
+            # generate masks
             detections.mask = self.segment(
                 sam_predictor=self.sam_predictor,
                 image=image_np,
@@ -272,35 +274,47 @@ class WrappedMasking(
             for mask, class_id in zip(detections.mask, detections.class_id):
                 grouped.setdefault(class_id, []).append(mask)
 
+            # get the masks for the classes we are interested in
             for class_id, masks in grouped.items():
                 if class_id in self.INCLUDE_CLASS_IDS and len(masks) > 0:
                     merged_mask = np.any(np.stack(masks, axis=0), axis=0)
                     merged_masks.append(merged_mask)
-                    for image_mask in merged_masks:
-                        # mask_uint8 = (merged_mask.astype(np.uint8)) * 255
-                        if self.CLASSES[class_id] in class_mask_results:
-                            class_mask_results[self.CLASSES[class_id]] = (
-                                self.mask_to_bytes(image_mask)
-                            )
+                    class_name = self.CLASSES[class_id]
+                    class_mask_results[class_name] = self.mask_to_bytes(merged_mask)
 
+            # merge the masks
             final_mask = np.any(np.stack(merged_masks, axis=0), axis=0)
-            # final_mask_uint8 = (final_mask.astype(np.uint8)) * 255
             final_mask_bytes = self.mask_to_bytes(
                 final_mask,
             )
 
+            # make sure masks are in binary
+            combined = (
+                final_mask_bytes
+                if final_mask_bytes
+                else self.empty_png(image_np.shape[:2])
+            )
+            leaf = (
+                class_mask_results["leaf"]
+                if class_mask_results["leaf"]
+                else self.empty_png(image_np.shape[:2])
+            )
+            flower = (
+                class_mask_results["flower"]
+                if class_mask_results["flower"]
+                else self.empty_png(image_np.shape[:2])
+            )
+            plant = (
+                class_mask_results["plant"]
+                if class_mask_results["plant"]
+                else self.empty_png(image_np.shape[:2])
+            )
+
             return {
-                "combined_mask": (
-                    final_mask_bytes
-                    if final_mask_bytes is not None
-                    else self.empty_png(image_np.shape[:2])
-                ),
-                "leaf_mask": class_mask_results.get("leaf")
-                or self.empty_png(image_np.shape[:2]),
-                "flower_mask": class_mask_results.get("flower")
-                or self.empty_png(image_np.shape[:2]),
-                "plant_mask": class_mask_results.get("plant")
-                or self.empty_png(image_np.shape[:2]),
+                "combined_mask": combined,
+                "leaf_mask": leaf,
+                "flower_mask": flower,
+                "plant_mask": plant,
             }
 
         return predict
@@ -321,20 +335,3 @@ class WrappedMasking(
         return df.withColumn(
             self.getOutputCol(), predict_udf(F.col(self.getInputCol()))
         )
-
-    # def _transform(self, df: DataFrame):
-    #     return df.withColumn(
-    #         self.getOutputCol(),  # a single column name
-    #         predict_batch_udf(
-    #             make_predict_fn=self._make_predict_fn,
-    #             return_type=StructType(
-    #                 [
-    #                     StructField("leaf_mask", ArrayType(FloatType()), False),
-    #                     StructField("flower_mask", ArrayType(FloatType()), False),
-    #                     StructField("plant_mask", ArrayType(FloatType()), False),
-    #                     StructField("final_mask", ArrayType(FloatType()), False),
-    #                 ]
-    #             ),
-    #             batch_size=self.getBatchSize(),
-    #         )(self.getInputCol()),
-    #     )

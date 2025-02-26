@@ -16,7 +16,7 @@ from plantclef.model_setup import (
 )
 
 
-class ProcessMasks(luigi.Task):
+class ProcessMasking(luigi.Task):
     """Task to process embeddings."""
 
     input_path = luigi.Parameter()
@@ -30,9 +30,7 @@ class ProcessMasks(luigi.Task):
     num_sample_ids = luigi.OptionalIntParameter(default=20)
     # controls the number of partitions written to disk, must be at least the number
     # of tasks that we have in parallel to best take advantage of disk
-    sql_statement = luigi.Parameter(
-        default="SELECT image_name, species_id, cls_embedding FROM __THIS__"
-    )
+    sql_statement = luigi.Parameter(default="SELECT image_name, masks FROM __THIS__")
     checkpoint_path_sam = luigi.Parameter(
         default=setup_segment_anything_checkpoint_path()
     )
@@ -76,9 +74,17 @@ class ProcessMasks(luigi.Task):
 
         for c in features:
             # check if the feature is a vector and convert it to an array
-            if "array" in transformed.schema[c].simpleString():
-                continue
-            transformed = transformed.withColumn(c, vector_to_array(F.col(c)))
+            if "vector" in transformed.schema[c].simpleString():
+                transformed = transformed.withColumn(c, vector_to_array(F.col(c)))
+
+        transformed = (
+            transformed.withColumn("combined_mask", F.col("masks.combined_mask"))
+            .withColumn("leaf_mask", F.col("masks.leaf_mask"))
+            .withColumn("flower_mask", F.col("masks.flower_mask"))
+            .withColumn("plant_mask", F.col("masks.plant_mask"))
+            .drop("masks")
+        )
+
         return transformed
 
     def run(self):
@@ -103,14 +109,6 @@ class ProcessMasks(luigi.Task):
 
             # transform the dataframe and write to disk
             transformed = self.transform(pipeline_model, df, self.feature_columns)
-
-            transformed = (
-                transformed.withColumn("combined_mask", F.col("masks.combined_mask"))
-                .withColumn("leaf_mask", F.col("masks.leaf_mask"))
-                .withColumn("flower_mask", F.col("masks.flower_mask"))
-                .withColumn("plant_mask", F.col("masks.plant_mask"))
-                .drop("masks")
-            )
             transformed.printSchema()
             transformed.explain()
             # write dataframe to disk
@@ -141,7 +139,7 @@ class Workflow(luigi.WrapperTask):
 
         tasks = []
         for sample_id in sample_ids:
-            task = ProcessMasks(
+            task = ProcessMasking(
                 input_path=self.input_path,
                 output_path=self.output_path,
                 cpu_count=self.cpu_count,
