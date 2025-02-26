@@ -6,7 +6,6 @@
 # Run with:
 #    source scripts/activate.sh
 
-set -euo pipefail
 
 # Determine the directory of this script
 SCRIPT_PARENT_ROOT="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
@@ -23,10 +22,4 @@ XDG_CACHE_HOME="$HOME/scratch/.cache"
 export XDG_CACHE_HOME
 
 # Source the SLURM virtual environment setup script
-SLURM_VENV_SCRIPT="$SCRIPT_PARENT_ROOT/utils/slurm-venv.sh"
-if [[ -f "$SLURM_VENV_SCRIPT" ]]; then
-    source "$SLURM_VENV_SCRIPT"
-else
-    echo "Error: $SLURM_VENV_SCRIPT not found." >&2
-    exit 1
-fi
+source "$SCRIPT_PARENT_ROOT/utils/slurm-venv.sh"
