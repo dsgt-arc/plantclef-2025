@@ -60,7 +60,7 @@ class WrappedMasking(
         self.sam_model = SamModel.from_pretrained(checkpoint_path_sam).to(self.device)
         self.sam_processor = SamProcessor.from_pretrained(checkpoint_path_sam)
         # https://huggingface.co/docs/transformers/main/en/model_doc/grounding-dino#transformers.GroundingDinoForObjectDetection
-        self.groundingdino_model = AutoModelForZeroShotObjectDetection(
+        self.groundingdino_model = AutoModelForZeroShotObjectDetection.from_pretrained(
             checkpoint_path_groundingdino
         ).to(self.device)
         self.groundingdino_processor = AutoProcessor.from_pretrained(

@@ -20,6 +20,9 @@ export PYTEST_DEBUG_TEMPROOT
 
 XDG_CACHE_HOME="$HOME/scratch/.cache"
 export XDG_CACHE_HOME
+# for large models and datasets from huggingface/transformers
+HF_HOME="$XDG_CACHE_HOME/huggingface"
+export HF_HOME
 
 # Source the SLURM virtual environment setup script
 source "$SCRIPT_PARENT_ROOT/utils/slurm-venv.sh"
