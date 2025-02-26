@@ -96,11 +96,26 @@ class WrappedMasking(
         except Exception as e:
             print(f"nvidia-smi failed: {e}")
 
-    def segment(
-        self,
-        image: np.ndarray,
-        xyxy: np.ndarray,
-    ) -> np.ndarray:
+    def detect(self, image: Image) -> dict:
+        # predict with groundingdino
+        inputs = self.groundingdino_processor(
+            images=image,
+            text=self.enhance_class_name(class_names=self.CLASSES),
+            return_tensors="pt",
+        ).to(self.device)
+
+        with torch.no_grad():
+            outputs = self.groundingdino_model(**inputs)
+
+        # dictionary with boxes, scores, text_labels
+        return self.groundingdino_processor.post_process_grounded_object_detection(
+            outputs,
+            threshold=self.BOX_THRESHOLD,
+            text_threshold=self.TEXT_THRESHOLD,
+            target_sizes=[(image.height, image.width)],
+        )
+
+    def segment(self, image: Image, xyxy: np.ndarray) -> np.ndarray:
         inputs = self.sam_processor(image, input_points=xyxy, return_tensors="pt").to(
             self.device
         )
@@ -145,26 +160,8 @@ class WrappedMasking(
             # convert binary to RGB
             image = Image.open(io.BytesIO(input_image)).convert("RGB")
 
-            # predict with groundingdino
-            inputs = self.groundingdino_processor(
-                images=image,
-                text=self.enhance_class_name(class_names=self.CLASSES),
-                return_tensors="pt",
-            ).to(self.device)
-
-            with torch.no_grad():
-                outputs = self.groundingdino_model(**inputs)
-
-            detections = (
-                self.groundingdino_processor.post_process_grounded_object_detection(
-                    outputs,
-                    threshold=self.BOX_THRESHOLD,
-                    text_threshold=self.TEXT_THRESHOLD,
-                    target_sizes=[(image.height, image.width)],
-                )
-            )
-
-            masks = self.segment(image=image, xyxy=detections["boxes"])
+            detections = self.detect(image)
+            masks = self.segment(image, xyxy=detections["boxes"])
 
             empty_image = self.empty_png(image.shape[:2])
             class_mask_results = {
