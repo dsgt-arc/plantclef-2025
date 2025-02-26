@@ -21,8 +21,9 @@ def spark_df(test_image_path):
     image_df = (
         spark.read.format("binaryFile")
         .load(test_image_path.as_posix())
-        .withColumnRenamed("content", "img")
+        .withColumnRenamed("content", "data")
+        .withColumnRenamed("path", "image_name")
     )
     image_df.printSchema()
-    image_df = image_df.select("img")
+    image_df = image_df.select("data", "image_name")
     return image_df
