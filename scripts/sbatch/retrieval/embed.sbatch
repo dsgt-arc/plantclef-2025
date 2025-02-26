@@ -2,17 +2,15 @@
 #SBATCH --job-name=plantclef-embed              # Job name
 #SBATCH --account=paceship-dsgt_clef2025        # charge account
 #SBATCH --nodes=1                               # Number of nodes
-#SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
+#SBATCH --gres=gpu:RTX_6000:1                   # Number of GPUs per node
 #SBATCH --cpus-per-task=6                       # Number of cores per task
-#SBATCH --mem-per-gpu=64G                       # Memory per core
-#SBATCH --time=120                              # Duration of the job (1h20min)
-#SBATCH --qos=inferno                            # QOS Name
+#SBATCH --mem-per-gpu=32G                       # Memory per core
+#SBATCH --time=120                              # Duration of the job
+#SBATCH --qos=embers                            # QOS Name
 #SBATCH --output=Report-%j.log                  # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=acheung@gatech.edu          # E-mail address for notifications
 
-# for parallel runs, break into 5 jobs 5 at a time e.g.
-#SBATCH --array=0-4%5
 
 set -xe
 export NO_REINSTALL=1
@@ -50,10 +48,11 @@ dataset_name=test_2024
 plantclef retrieval embed workflow \
     $scratch_data_dir/parquet/$dataset_name \
     $scratch_data_dir/embeddings/test/$dataset_name \
+    --grid-size 3 \
     --cpu-count 6 \
     --batch-size 1 \
-    --num-sample-ids 5 \
-    --sample-id $SLURM_ARRAY_TASK_ID
+    # --num-sample-ids 1 \
+    # --sample-id $SLURM_ARRAY_TASK_ID
 
 # parse the nvida monitoring output
 python ~/clef/plantclef-2025/scripts/nvidia-logs.sh parse Report-${SLURM_JOB_ID}-nvidia-logs.ndjson

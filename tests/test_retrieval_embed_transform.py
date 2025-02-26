@@ -36,6 +36,7 @@ def test_wrapped_finetuned_dinov2(spark_df, model_name, expected_dim):
         model_path=setup_fine_tuned_model(),
         model_name=model_name,
         batch_size=2,
+        use_grid=True,
         grid_size=3,
     )
     transformed = model.transform(spark_df).cache()

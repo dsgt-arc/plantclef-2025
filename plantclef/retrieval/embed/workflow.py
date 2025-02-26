@@ -109,7 +109,6 @@ class Workflow(luigi.Task):
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
-    # submission_path = luigi.Parameter()
     sample_id = luigi.OptionalParameter()
     num_sample_ids = luigi.IntParameter(default=20)
     cpu_count = luigi.IntParameter(default=6)
@@ -117,59 +116,61 @@ class Workflow(luigi.Task):
     # set use_grid=False to perform inference on the entire image
     use_grid = luigi.BoolParameter(default=True)
     grid_size = luigi.IntParameter(default=3)  # 3x3 grid
-    # top_k_proba = luigi.IntParameter(default=5)  # top 5 species
     num_partitions = luigi.IntParameter(default=10)
 
     def requires(self):
         # either we run a single task or we run all the tasks
-        if self.sample_id is not None:
-            sample_ids = [self.sample_id]
-        else:
-            sample_ids = list(range(self.num_tasks))
+        # if self.sample_id is not None:
+        #     sample_ids = [self.sample_id]
+        # else:
+        #     sample_ids = list(range(self.num_tasks))
 
         if self.use_grid:
             file_name = f"grid={self.grid_size}x{self.grid_size}"
             output_path = f"{self.output_path}/{file_name}"
-        tasks = []
-        for sample_id in sample_ids:
-            task = ProcessEmbeddings(
-                input_path=self.input_path,
-                output_path=output_path,
-                cpu_count=self.cpu_count,
-                batch_size=self.batch_size,
-                sample_id=sample_id,
-                num_sample_ids=self.num_sample_ids,
-                use_grid=self.use_grid,
-                grid_size=self.grid_size,
-                num_partitions=self.num_partitions,
-            )
-            tasks.append(task)
+            
+        task = ProcessEmbeddings(
+            input_path=self.input_path,
+            output_path=output_path,
+            cpu_count=self.cpu_count,
+            batch_size=self.batch_size,
+            sample_id=0,
+            num_sample_ids=1,
+            use_grid=self.use_grid,
+            grid_size=self.grid_size,
+            num_partitions=self.num_partitions,
+        )
+        yield task
+            
+        # tasks = []
+        # for sample_id in sample_ids:
+            # task = ProcessEmbeddings(
+            #     input_path=self.input_path,
+            #     output_path=output_path,
+            #     cpu_count=self.cpu_count,
+            #     batch_size=self.batch_size,
+            #     sample_id=sample_id,
+            #     num_sample_ids=self.num_sample_ids,
+            #     use_grid=self.use_grid,
+            #     grid_size=self.grid_size,
+            #     num_partitions=self.num_partitions,
+            # )
+            # tasks.append(task)
 
         # run ProcessInference tasks before the Submission task
-        for task in tasks:
-            yield task
-        
-        # run Submission task
-        # yield SubmissionTask(
-        #     input_path=output_path,
-        #     output_path=self.submission_path,
-        #     top_k=self.top_k_proba,
-        #     use_grid=self.use_grid,
-        #     grid_size=self.grid_size,
-        # )
+        # for task in tasks:
+        #     yield task
 
 
 def main(
     input_path: Annotated[str, typer.Argument(help="Input root directory")],
     output_path: Annotated[str, typer.Argument(help="Output root directory")],
-    # submission_path: Annotated[str, typer.Argument(help="Submission root directory")],
     cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 4,
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
     use_grid: Annotated[bool, typer.Option(help="Use grid")] = True,
     grid_size: Annotated[int, typer.Option(help="Grid size")] = 3,
-    # top_k_proba: Annotated[int, typer.Option(help="Top K probability")] = 5,
     num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 10,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
@@ -185,14 +186,12 @@ def main(
             Workflow(
                 input_path=input_path,
                 output_path=output_path,
-                # submission_path=submission_path,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
                 num_sample_ids=num_sample_ids,
                 sample_id=sample_id,
                 use_grid=use_grid,
                 grid_size=grid_size,
-                # top_k_proba=top_k_proba,
                 num_partitions=num_partitions,
             )
         ],

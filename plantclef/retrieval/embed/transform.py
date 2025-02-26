@@ -128,17 +128,8 @@ class EmbedderFineTunedDINOv2(
         # Move model to GPU if available
         self.model.to(self.device)
         self.model.eval()
-        # path for class_mappings.txt file
-        # self.class_mapping_file = get_class_mappings_file()
-        # load class mappings
-        # self.cid_to_spid = self._load_class_mapping()
         self.use_grid = use_grid
         self.grid_size = grid_size
-
-    # def _load_class_mapping(self):
-    #     with open(self.class_mapping_file) as f:
-    #         class_index_to_class_name = {i: line.strip() for i, line in enumerate(f)}
-    #     return class_index_to_class_name
 
     def _split_into_grid(self, image):
         w, h = image.size
@@ -182,19 +173,12 @@ class EmbedderFineTunedDINOv2(
                 processed_image = self.transforms(tile).unsqueeze(0).to(self.device)
                 with torch.no_grad():
                     features = self.model.forward_features(processed_image)
-                    cls_token = features[:, 0, :]
+                    cls_token = features[:, 0, :].squeeze(0)
                 cls_embeddings = cls_token.cpu().numpy().tolist()
                 results.append(cls_embeddings)
             return results
 
         return predict
-
-    # def _transform(self, df: DataFrame):
-    #     predict_fn = self._make_predict_fn()
-    #     predict_udf = F.udf(predict_fn, ArrayType(ArrayType(FloatType())))
-    #     return df.withColumn(
-    #         self.getOutputCol(), predict_udf(F.col(self.getInputCol()))
-    #     )
         
     def _transform(self, df: DataFrame):
         predict_fn = self._make_predict_fn()
@@ -205,11 +189,6 @@ class EmbedderFineTunedDINOv2(
             .drop(self.getInputCol())
         
         # explode embeddings so that each row has a single tile embedding
-        # explode_expr = F.posexplode(intermediate_col)
-        # df = df \
-        #     .withColumn("tile", explode_expr.getItem(0)) \
-        #     .withColumn(self.getOutputCol(), explode_expr.getItem(1)) \
-        #     .drop(intermediate_col)
         df = df.selectExpr(
             "*",
             f"posexplode({intermediate_col}) as (tile, {self.getOutputCol()})"
