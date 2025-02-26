@@ -139,26 +139,11 @@ class WrappedMasking(
         # convert to numpy
         return np.array(masks)
 
-    def mask_to_bytes(self, image_array):
-        # ensure the input is uint8 (0-255)
-        mask_uint8 = np.clip(image_array, 0, 255).astype(np.uint8)
-        # convert grayscale mask to 3-channel (RGB)
-        if mask_uint8.ndim == 2:  # if single-channel, expand to 3 channels
-            mask_rgb = np.stack([mask_uint8] * 3, axis=-1)  # Convert to (H, W, 3)
-        else:
-            mask_rgb = mask_uint8  # Assume it's already (H, W, 3)
-        # convert to RGB image
-        img = Image.fromarray(mask_rgb, mode="RGB")
-        # save as PNG to a bytes buffer
-        img_bytes_io = io.BytesIO()
-        img.save(img_bytes_io, format="PNG")
-        # retrieve bytes and return
-        return img_bytes_io.getvalue()
-
-    def empty_png(self, shape):
-        # Create an empty RGB image (height, width, 3)
-        empty_array = np.zeros((shape[0], shape[1], 3), dtype=np.uint8)
-        return self.mask_to_bytes(empty_array)
+    def mask_to_bytes(self, image_array: np.ndarray) -> bytes:
+        """Encode the numpy mask array as raw bytes using np.save()."""
+        buffer = io.BytesIO()
+        np.save(buffer, image_array)  # save array to buffer
+        return buffer.getvalue()  # convert buffer to bytes
 
     def group_masks_by_class(self, masks: np.ndarray, scores: torch.Tensor) -> dict:
         """Groups segmentation masks by class ID using the highest confidence score."""
@@ -174,36 +159,37 @@ class WrappedMasking(
 
         return grouped
 
-    def merge_masks(self, grouped_masks: dict, empty_image: bytes) -> tuple:
+    def empty_array(self, shape) -> bytes:
+        """Create an empty numpy mask (H, W) and returns it as bytes."""
+        empty_mask = np.zeros((shape[0], shape[1]), dtype=np.uint8)
+        return self.mask_to_bytes(empty_mask)  # store as raw bytes
+
+    def merge_masks(self, grouped_masks: dict, empty_shape) -> tuple:
         """Merges masks for each class and prepares the output dictionary."""
+
+        empty_mask = np.zeros(empty_shape, dtype=np.uint8)
+        empty_mask_bytes = self.mask_to_bytes(empty_mask)
+
         class_mask_results = {
-            "leaf": empty_image,
-            "flower": empty_image,
-            "plant": empty_image,
+            "leaf": empty_mask_bytes,
+            "flower": empty_mask_bytes,
+            "plant": empty_mask_bytes,
         }
 
         merged_masks = []
         for class_id, masks in grouped_masks.items():
             if class_id in self.INCLUDE_CLASS_IDS and len(masks) > 0:
-                merged_mask = np.any(np.stack(masks, axis=0), axis=0)
-
-                # squeeze specific axes if they exist (batch/channel dims)
-                if merged_mask.shape[0] > 10:  # likely batch dimension
-                    merged_mask = merged_mask[0]  # take first batch
-                if merged_mask.shape[0] == 3:  # likely channel dimension
-                    merged_mask = merged_mask[0]  # take first channel
-
+                merged_mask = np.any(np.stack(masks, axis=0), axis=0).astype(np.uint8)
+                merged_mask = np.squeeze(merged_mask)  # ensure (H, W)
                 merged_masks.append(merged_mask)
                 class_name = self.CLASSES[class_id]
-                rgb_mask = np.stack([merged_mask] * 3, axis=-1)  # ensure (H, W, 3)
-                class_mask_results[class_name] = self.mask_to_bytes(rgb_mask)
+                class_mask_results[class_name] = self.mask_to_bytes(merged_mask)
 
         if merged_masks:
-            final_mask = np.any(np.stack(merged_masks, axis=0), axis=0)
-            final_rgb_mask = np.stack([final_mask] * 3, axis=-1)
-            final_mask_bytes = self.mask_to_bytes(final_rgb_mask)
+            final_mask = np.any(np.stack(merged_masks, axis=0), axis=0).astype(np.uint8)
+            final_mask_bytes = self.mask_to_bytes(final_mask)
         else:
-            final_mask_bytes = empty_image
+            final_mask_bytes = empty_mask_bytes
 
         return final_mask_bytes, class_mask_results
 
@@ -220,10 +206,10 @@ class WrappedMasking(
             input_boxes = self.convert_boxes_to_tensor(detections)
             masks = self.segment(image, input_boxes=input_boxes)
 
-            empty_image = self.empty_png(image.size[::-1])  # extract (H, W)
+            empty_shape = image.size[::-1]  # extract (H, W)
             grouped_masks = self.group_masks_by_class(masks, detections["scores"])
             final_mask_bytes, class_mask_results = self.merge_masks(
-                grouped_masks, empty_image
+                grouped_masks, empty_shape
             )
 
             return {
