@@ -32,15 +32,11 @@ class ProcessMasking(luigi.Task):
     # of tasks that we have in parallel to best take advantage of disk
     sql_statement = luigi.Parameter(default="SELECT image_name, masks FROM __THIS__")
     checkpoint_path_sam = luigi.Parameter(
-        default=setup_segment_anything_checkpoint_path()
+        default="facebook/sam-vit-huge",
     )
     checkpoint_path_groundingdino = luigi.Parameter(
-        default=setup_groundingdino_checkpoint_path()
+        default="IDEA-Research/grounding-dino-base",
     )
-    config_path_groundingdino = luigi.Parameter(
-        default=setup_groundingdino_config_path()
-    )
-    encoder_version = luigi.Parameter(default="vit_h")
 
     def output(self):
         # write a partitioned dataset to disk
@@ -56,8 +52,6 @@ class ProcessMasking(luigi.Task):
                     output_col="masks",
                     checkpoint_path_sam=self.checkpoint_path_sam,
                     checkpoint_path_groundingdino=self.checkpoint_path_groundingdino,
-                    config_path_groundingdino=self.config_path_groundingdino,
-                    encoder_version=self.encoder_version,
                     batch_size=self.batch_size,
                 ),
                 SQLTransformer(statement=self.sql_statement),

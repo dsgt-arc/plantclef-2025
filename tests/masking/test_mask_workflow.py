@@ -1,46 +1,15 @@
 import pytest
 import luigi
-from pathlib import Path
 
-from plantclef.masking.workflow import ProcessMasking
 from plantclef.spark import get_spark
+from plantclef.masking.workflow import ProcessMasking
 from plantclef.masking.transform import WrappedMasking
-from plantclef.model_setup import (
-    setup_segment_anything_checkpoint_path,
-    setup_groundingdino_checkpoint_path,
-    setup_groundingdino_config_path,
-)
-
-
-@pytest.fixture
-def spark_df():
-    spark = get_spark(cores=2, memory="16g", app_name="pytest")
-    # image path
-    image_path = Path(__file__).parent / "images/CBN-can-A1-20230705.jpg"
-    # dataframe with a single image column
-    image_df = (
-        spark.read.format("binaryFile")
-        .load(image_path.as_posix())
-        .withColumnRenamed("content", "data")
-        .withColumnRenamed("path", "image_name")
-    )
-    image_df.printSchema()
-    image_df = image_df.select("image_name", "data")
-    return image_df
 
 
 @pytest.fixture
 def transformed_df(spark_df):
     # transform image and return masks
-    model = WrappedMasking(
-        input_col="data",
-        output_col="masks",
-        checkpoint_path_sam=setup_segment_anything_checkpoint_path(),
-        checkpoint_path_groundingdino=setup_groundingdino_checkpoint_path(),
-        config_path_groundingdino=setup_groundingdino_config_path(),
-        encoder_version="vit_h",
-        batch_size=1,
-    )
+    model = WrappedMasking(input_col="data", output_col="masks", batch_size=1)
     transformed = model.transform(spark_df).cache()
     return transformed
 
