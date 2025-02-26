@@ -1,6 +1,5 @@
 #!/bin/bash
 set -xe
-export NO_REINSTALL=1
 
 # Print system info
 echo "Hostname: $(hostname)"
@@ -8,8 +7,7 @@ echo "Number of CPUs: $(nproc)"
 echo "Available memory: $(free -h)"
 
 # Activate the environment
-# source ~/clef/plantclef-2025/scripts/activate-mask-venv.sh
-source ~/scratch/plantclef/mask-venv/bin/activate
+source ~/clef/plantclef-2025/scripts/activate.sh
 
 # Check GPU availability
 python -c "import torch; print(torch.cuda.is_available())"  # Check if PyTorch can access the GPU
@@ -30,15 +28,13 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
 dataset_name=test_2024
+num_rows=20
 
 # Run the Python script
-plantclef masking workflow \
-    $scratch_data_dir/parquet/$dataset_name \
-    $scratch_data_dir/masking/$dataset_name \
-    --cpu-count 1 \
-    --batch-size 1 \
-    --num-sample-ids 1 \
-    --sample-id 0
+plantclef preprocessing create_test_subset \
+    $project_data_dir/parquet/$dataset_name \
+    $project_data_dir/parquet/${dataset_name}_subset${num_rows} \
+    --num-rows $num_rows
 
 # Parse the NVIDIA monitoring output
 python ~/clef/plantclef-2025/scripts/nvidia-logs.sh parse $NVIDIA_LOG_FILE
