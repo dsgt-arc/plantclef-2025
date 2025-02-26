@@ -30,7 +30,9 @@ class ProcessEmbeddings(luigi.Task):
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
     use_grid = luigi.BoolParameter(default=True)
     grid_size = luigi.IntParameter(default=3)
-    sql_statement = luigi.Parameter(default="SELECT image_name, logits FROM __THIS__")
+    sql_statement = luigi.Parameter(
+        default="SELECT image_name, tile, cls_embedding FROM __THIS__"
+    )
 
     def output(self):
         # write a partitioned dataset to disk
@@ -43,7 +45,7 @@ class ProcessEmbeddings(luigi.Task):
             stages=[
                 EmbedderFineTunedDINOv2(
                     input_col="data",
-                    output_col="logits",
+                    output_col="cls_embedding",
                     model_path=self.model_path,
                     model_name=self.model_name,
                     batch_size=self.batch_size,
@@ -57,7 +59,7 @@ class ProcessEmbeddings(luigi.Task):
 
     @property
     def feature_columns(self) -> list:
-        return ["logits"]
+        return ["cls_embedding"]
 
     def transform(self, model, df, features) -> DataFrame:
         transformed = model.transform(df)
@@ -107,7 +109,7 @@ class Workflow(luigi.Task):
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
-    submission_path = luigi.Parameter()
+    # submission_path = luigi.Parameter()
     sample_id = luigi.OptionalParameter()
     num_sample_ids = luigi.IntParameter(default=20)
     cpu_count = luigi.IntParameter(default=6)
@@ -115,7 +117,7 @@ class Workflow(luigi.Task):
     # set use_grid=False to perform inference on the entire image
     use_grid = luigi.BoolParameter(default=True)
     grid_size = luigi.IntParameter(default=3)  # 3x3 grid
-    top_k_proba = luigi.IntParameter(default=5)  # top 5 species
+    # top_k_proba = luigi.IntParameter(default=5)  # top 5 species
     num_partitions = luigi.IntParameter(default=10)
 
     def requires(self):
@@ -160,18 +162,17 @@ class Workflow(luigi.Task):
 def main(
     input_path: Annotated[str, typer.Argument(help="Input root directory")],
     output_path: Annotated[str, typer.Argument(help="Output root directory")],
-    submission_path: Annotated[str, typer.Argument(help="Submission root directory")],
+    # submission_path: Annotated[str, typer.Argument(help="Submission root directory")],
     cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 4,
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
     use_grid: Annotated[bool, typer.Option(help="Use grid")] = True,
     grid_size: Annotated[int, typer.Option(help="Grid size")] = 3,
-    top_k_proba: Annotated[int, typer.Option(help="Top K probability")] = 5,
+    # top_k_proba: Annotated[int, typer.Option(help="Top K probability")] = 5,
     num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 10,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
-    print("AJUNGY Running workflow")
     # run the workflow
     kwargs = {}
     if scheduler_host:
@@ -184,14 +185,14 @@ def main(
             Workflow(
                 input_path=input_path,
                 output_path=output_path,
-                submission_path=submission_path,
+                # submission_path=submission_path,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
                 num_sample_ids=num_sample_ids,
                 sample_id=sample_id,
                 use_grid=use_grid,
                 grid_size=grid_size,
-                top_k_proba=top_k_proba,
+                # top_k_proba=top_k_proba,
                 num_partitions=num_partitions,
             )
         ],
