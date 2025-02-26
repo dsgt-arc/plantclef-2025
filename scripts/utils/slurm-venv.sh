@@ -27,6 +27,10 @@ if ! command -v uv &> /dev/null; then
     python -m ensurepip
     pip install --upgrade pip uv
 fi
+
+# Add local/bin to PATH
+export PATH=$HOME/.local/bin:$PATH
+
 uv venv venv
 source venv/bin/activate
 
