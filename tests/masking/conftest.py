@@ -16,7 +16,7 @@ def test_image(test_image_path) -> Image:
 
 @pytest.fixture
 def spark_df(test_image_path):
-    spark = get_spark(cores=1, memory="4g", app_name="pytest")
+    spark = get_spark(cores=1, memory="16g", app_name="pytest")
     # dataframe with a single image column
     image_df = (
         spark.read.format("binaryFile")
