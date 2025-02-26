@@ -35,7 +35,7 @@ dataset_name=test_2024
 plantclef masking workflow \
     $scratch_data_dir/parquet/$dataset_name \
     $scratch_data_dir/masking/$dataset_name \
-    --cpu-count 2 \
+    --cpu-count 1 \
     --batch-size 1 \
     --num-sample-ids 1 \
     --sample-id 0
