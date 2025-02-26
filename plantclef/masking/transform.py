@@ -96,6 +96,9 @@ class WrappedMasking(
         except Exception as e:
             print(f"nvidia-smi failed: {e}")
 
+    def enhance_class_name(self, class_names: List[str]) -> List[str]:
+        return [f"all {class_name}" for class_name in class_names]
+
     def detect(self, image: Image) -> dict:
         # predict with groundingdino
         inputs = self.groundingdino_processor(
@@ -133,12 +136,8 @@ class WrappedMasking(
             inputs["original_sizes"].cpu(),
             inputs["reshaped_input_sizes"].cpu(),
         )
-        # scores = outputs.iou_scores
         # convert to numpy
         return np.array(masks)
-
-    def enhance_class_name(self, class_names: List[str]) -> List[str]:
-        return [f"all {class_name}" for class_name in class_names]
 
     def mask_to_bytes(self, image_array):
         # ensure the input is uint8 (0-255)
@@ -161,6 +160,53 @@ class WrappedMasking(
         empty_array = np.zeros((shape[0], shape[1], 3), dtype=np.uint8)
         return self.mask_to_bytes(empty_array)
 
+    def group_masks_by_class(self, masks: np.ndarray, scores: torch.Tensor) -> dict:
+        """Groups segmentation masks by class ID using the highest confidence score."""
+        grouped = {}
+        class_ids = torch.argmax(scores, dim=-1)
+
+        # ensure class_ids is iterable
+        if class_ids.dim() == 0:
+            class_ids = class_ids.unsqueeze(0)
+
+        for mask, class_id in zip(masks, class_ids.tolist()):
+            grouped.setdefault(class_id, []).append(mask)
+
+        return grouped
+
+    def merge_masks(self, grouped_masks: dict, empty_image: bytes) -> tuple:
+        """Merges masks for each class and prepares the output dictionary."""
+        class_mask_results = {
+            "leaf": empty_image,
+            "flower": empty_image,
+            "plant": empty_image,
+        }
+
+        merged_masks = []
+        for class_id, masks in grouped_masks.items():
+            if class_id in self.INCLUDE_CLASS_IDS and len(masks) > 0:
+                merged_mask = np.any(np.stack(masks, axis=0), axis=0)
+
+                # squeeze specific axes if they exist (batch/channel dims)
+                if merged_mask.shape[0] > 10:  # likely batch dimension
+                    merged_mask = merged_mask[0]  # take first batch
+                if merged_mask.shape[0] == 3:  # likely channel dimension
+                    merged_mask = merged_mask[0]  # take first channel
+
+                merged_masks.append(merged_mask)
+                class_name = self.CLASSES[class_id]
+                rgb_mask = np.stack([merged_mask] * 3, axis=-1)  # ensure (H, W, 3)
+                class_mask_results[class_name] = self.mask_to_bytes(rgb_mask)
+
+        if merged_masks:
+            final_mask = np.any(np.stack(merged_masks, axis=0), axis=0)
+            final_rgb_mask = np.stack([final_mask] * 3, axis=-1)
+            final_mask_bytes = self.mask_to_bytes(final_rgb_mask)
+        else:
+            final_mask_bytes = empty_image
+
+        return final_mask_bytes, class_mask_results
+
     def _make_predict_fn(self):
         """Return PredictBatchFunction using a closure over the model"""
 
@@ -170,44 +216,18 @@ class WrappedMasking(
         def predict(input_image: np.ndarray) -> np.ndarray:
             # convert binary to RGB
             image = Image.open(io.BytesIO(input_image)).convert("RGB")
-
             detections = self.detect(image)  # returns list of dictionaries
-            # # move tensors to CPU
-            # detections = {k: v.cpu() if isinstance(v, torch.Tensor) else v for k, v in detections.items()}
-            # get input_boxes as tensors for segmentation
             input_boxes = self.convert_boxes_to_tensor(detections)
             masks = self.segment(image, input_boxes=input_boxes)
 
             empty_image = self.empty_png(image.size[::-1])  # extract (H, W)
-            class_mask_results = {
-                "leaf": empty_image,
-                "flower": empty_image,
-                "plant": empty_image,
-            }
-            grouped = {}
-            for mask, class_id in zip(masks, torch.argmax(detections["scores"], dim=0)):
-                grouped.setdefault(class_id, []).append(mask)
-
-            # get the masks for the classes we are interested in
-            merged_masks = []
-            for class_id, masks in grouped.items():
-                if class_id in self.INCLUDE_CLASS_IDS and len(masks) > 0:
-                    merged_mask = torch.any(torch.stack(masks, dim=0), dim=0)
-                    merged_masks.append(merged_mask.cput().numpy())
-                    class_name = self.CLASSES[class_id]
-                    class_mask_results[class_name] = self.mask_to_bytes(
-                        merged_mask.cpu().numpy()
-                    )
-
-            # merge the masks
-            final_mask = torch.any(torch.stack(merged_masks, dim=0), dim=0)
-            final_mask_bytes = self.mask_to_bytes(final_mask.cpu().numpy())
-
-            # make sure masks are in binary
-            combined = final_mask_bytes or empty_image
+            grouped_masks = self.group_masks_by_class(masks, detections["scores"])
+            final_mask_bytes, class_mask_results = self.merge_masks(
+                grouped_masks, empty_image
+            )
 
             return {
-                "combined_mask": combined,
+                "combined_mask": final_mask_bytes,
                 **{f"{k}_mask": v for k, v in class_mask_results.items()},
             }
 
