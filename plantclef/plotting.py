@@ -197,6 +197,7 @@ def plot_masks_from_binary(
 def plot_individual_masks_comparison(
     joined_df,
     mask_names: list = ["leaf_mask", "flower_mask", "rock_mask"],
+    positive_classes: list = ["leaf_mask", "flower_mask"],
     label_col: str = "image_name",
     num_rows: int = 3,
     crop_square: bool = False,
@@ -216,44 +217,72 @@ def plot_individual_masks_comparison(
     :param figsize: Regulates the size of the figure.
     :param dpi: Dots Per Inch, determines the resolution of the output image.
     """
-    # Unpack the number of rows and columns for the grid
-    cols = len(mask_names) + 1
+    # unpack the number of rows and columns for the grid
+    cols = len(mask_names) + 2
 
-    # Collect binary image data from DataFrame
+    # collect binary image data from DataFrame
     subset_df = joined_df.limit(num_rows).collect()
 
-    # Create subplots for image and masks
+    # create subplots for image and masks
     fig, axes = plt.subplots(num_rows, cols, figsize=figsize, dpi=dpi)
 
-    # Ensure axes is always 2D for consistent iteration
+    # ensure axes is always 2D for consistent iteration
     axes = axes.reshape(num_rows, cols)
 
     for row_idx, row in enumerate(subset_df):
-        # Load original image
+        # load original image
         image = Image.open(io.BytesIO(row["data"])).convert("RGB")
         image_array = np.array(image)
 
         # Load masks
-        masks = [np.load(io.BytesIO(row[mask])) for mask in mask_names]
+        masks = {
+            mask_name: np.load(io.BytesIO(row[mask_name])) for mask_name in mask_names
+        }
 
         # Expand masks to match image dimensions
-        masks = [np.expand_dims(mask, axis=-1) for mask in masks]  # (H, W, 1)
-        masks = [np.repeat(mask, 3, axis=-1) for mask in masks]  # (H, W, 3)
+        masks_rgb = {
+            name: np.repeat(np.expand_dims(mask, axis=-1), 3, axis=-1)
+            for name, mask in masks.items()
+        }  # (H, W, 3)
 
-        # Plot original image
+        # plot original image
         axes[row_idx, 0].imshow(image_array)
         wrapped_name = "\n".join(textwrap.wrap(row[label_col], width=wrap_width))
         axes[row_idx, 0].set_title(wrapped_name, fontsize=fontsize, pad=1)
 
-        # Plot each mask
-        for col_idx, (mask, mask_name) in enumerate(zip(masks, mask_names), start=1):
-            masked_image = image_array * (mask * 255)
+        # initialize combined mask
+        combined_mask = np.zeros_like(next(iter(masks.values())))
+
+        # plot each mask
+        for col_idx, mask_name in enumerate(mask_names, start=1):
+            mask = masks_rgb[mask_name]
+
+            # Overlay mask onto the original image
+            masked_image = image_array * mask
             axes[row_idx, col_idx].imshow(masked_image.astype(np.uint8))
+
             name = mask_name.replace("_", " ").title()
             wrap_mask_name = "\n".join(textwrap.wrap(name, width=wrap_width))
             axes[row_idx, col_idx].set_title(wrap_mask_name, fontsize=fontsize, pad=1)
 
-        # Remove ticks and spines
+            # Combine masks if they are in positive_classes
+            if mask_name in positive_classes:
+                combined_mask |= masks[mask_name]  # Use bitwise OR to merge
+
+        # plot combined positive masks
+        combined_mask_rgb = np.clip(combined_mask, 0, 1)  # mask is binary
+        combined_mask_rgb = np.repeat(
+            np.expand_dims(combined_mask, axis=-1), 3, axis=-1
+        )  # (H, W, 3)
+        combined_overlay = (image_array * combined_mask_rgb).astype(np.uint8)
+
+        axes[row_idx, -1].imshow(combined_overlay)
+        wrap_mask_name = "\n".join(
+            textwrap.wrap("Combined Positive Masks", width=wrap_width)
+        )
+        axes[row_idx, -1].set_title(wrap_mask_name, fontsize=fontsize, pad=1)
+
+        # remove ticks and spines
         for ax in axes[row_idx, :]:
             ax.set_xticks([])
             ax.set_yticks([])
