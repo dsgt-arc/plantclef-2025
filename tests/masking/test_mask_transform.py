@@ -50,7 +50,7 @@ def test_wrapped_mask(spark_df):
     model = WrappedMasking(input_col="data", output_col="masks", batch_size=1)
     transformed = model.transform(spark_df).cache()
     transformed.printSchema()
-    transformed.show()
+    transformed.show(vertical=True, truncate=100, n=2)
     transformed.count()
 
     assert transformed.count() == 1

@@ -104,7 +104,6 @@ class WrappedMasking(
         inputs = self.groundingdino_processor(
             images=image,
             text=self.enhance_class_name(class_names=self.CLASSES),
-            # text=self.CLASSES,
             return_tensors="pt",
         ).to(self.device)
 
@@ -190,7 +189,7 @@ class WrappedMasking(
             masks = self.segment(image, input_boxes=input_boxes)
 
             final_mask, class_masks = self.merge_masks(
-                masks, detections["scores"], (image.height, image.width)
+                masks, detections["text_labels"], (image.height, image.width)
             )
 
             # print size of the final mask and mask results
