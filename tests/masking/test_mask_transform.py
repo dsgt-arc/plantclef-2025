@@ -1,6 +1,6 @@
 import io
-import torch
 import numpy as np
+from PIL import Image
 from plantclef.masking.transform import WrappedMasking
 
 
@@ -59,18 +59,22 @@ def test_wrapped_mask(spark_df):
     row = transformed.select("masks").first()
 
     # ensure that the output mask is a NumPy array
-    assert isinstance(row.masks["combined_mask"], bytes)
-    # Decode the bytes back into a NumPy array
+    print(f"combined mask type: {type(row.masks['combined_mask'])}")
+    assert isinstance(row.masks["combined_mask"], bytearray)
+
+    # decode the bytes back into a NumPy array
     mask = np.load(io.BytesIO(row.masks["combined_mask"]))
 
-    # Ensure the mask is a NumPy array
+    # ensure the mask is a NumPy array
     assert isinstance(mask, np.ndarray)
     assert mask.dtype == np.uint8
 
-    # Ensure mask has the expected dimensions (same as input image)
-    expected_shape = spark_df.select("img").first().img.shape[:2]
+    # ensure mask has the expected dimensions (same as input image)
+    img_data = spark_df.select("data").first().data
+    img = Image.open(io.BytesIO(img_data))
+    expected_shape = img.size[::-1]
     assert mask.shape == expected_shape
 
-    # Ensure mask contains only valid binary values (0 or 1)
+    # ensure mask contains only valid binary values (0 or 1)
     unique_values = np.unique(mask)
     assert set(unique_values).issubset({0, 1})

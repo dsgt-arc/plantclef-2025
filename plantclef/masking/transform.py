@@ -184,18 +184,13 @@ class WrappedMasking(
         def predict(input_image: np.ndarray) -> np.ndarray:
             # convert binary to RGB
             image = Image.open(io.BytesIO(input_image)).convert("RGB")
-            detections = self.detect(image)  # returns list of dictionaries
+            detections = self.detect(image)  # dictionary of the detections
             input_boxes = self.convert_boxes_to_tensor(detections)
             masks = self.segment(image, input_boxes=input_boxes)
 
             final_mask, class_masks = self.merge_masks(
                 masks, detections["text_labels"], (image.height, image.width)
             )
-
-            # print size of the final mask and mask results
-            # print(f"Final mask size: {final_mask.shape}", flush=True)
-            # for k, v in class_masks.items():
-            #     print(f"{k} mask size: {v.shape}", flush=True)
 
             return {
                 "combined_mask": self.mask_to_bytes(final_mask),
