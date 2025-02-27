@@ -14,6 +14,7 @@ def plot_images_from_binary(
     grid_size=(3, 3),
     crop_square: bool = False,
     figsize: tuple = (12, 12),
+    dpi: int = 80,
 ):
     """
     Display images in a grid with binomial names as labels.
@@ -24,6 +25,7 @@ def plot_images_from_binary(
     :param grid_size: Tuple (rows, cols) representing the grid size.
     :param crop_square: Boolean, whether to crop images to a square format by taking the center.
     :param figsize: Regulates the size of the figure.
+    :param dpi: Dots Per Inch, determines the resolution of the output image.
     """
     # Unpack the number of rows and columns for the grid
     rows, cols = grid_size
@@ -68,7 +70,14 @@ def plot_images_from_binary(
     plt.show()
 
 
-def plot_images_from_embeddings(df, data_col: str, image_col: str, grid_size=(3, 3)):
+def plot_images_from_embeddings(
+    df,
+    data_col: str,
+    image_col: str,
+    grid_size: tuple = (3, 3),
+    figsize: tuple = (12, 12),
+    dpi: int = 80,
+):
     """
     Display images in a grid with species names as labels.
 
@@ -76,6 +85,8 @@ def plot_images_from_embeddings(df, data_col: str, image_col: str, grid_size=(3,
     :param data_col: Name of the data column.
     :param image_col: Name of the species being displayed as image labels.
     :param grid_size: Tuple (rows, cols) representing the grid size.
+    :param figsize: Regulates the size of the figure.
+    :param dpi: Dots Per Inch, determines the resolution of the output image.
     """
     # Unpack the number of rows and columns for the grid
     rows, cols = grid_size
@@ -86,7 +97,7 @@ def plot_images_from_embeddings(df, data_col: str, image_col: str, grid_size=(3,
     image_names = [row[image_col] for row in subset_df]
 
     # Create a matplotlib subplot with specified grid size
-    fig, axes = plt.subplots(rows, cols, figsize=(12, 12), dpi=80)
+    fig, axes = plt.subplots(rows, cols, figsize=(12, 12), dpi=dpi)
 
     # Flatten the axes array for easy iteration
     axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
