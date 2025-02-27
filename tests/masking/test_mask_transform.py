@@ -104,10 +104,9 @@ def test_merge_masks():
     }
 
     # merge masks
-    final_mask_bytes, class_mask_results = model.merge_masks(grouped_masks, empty_shape)
+    final_mask_np, class_mask_results = model.merge_masks(grouped_masks, empty_shape)
 
     # ensure the function returns a NumPy array
-    final_mask_np = np.load(io.BytesIO(final_mask_bytes))
     assert isinstance(final_mask_np, np.ndarray)
     assert final_mask_np.dtype == np.uint8
     assert final_mask_np.shape == (4, 4)
@@ -118,9 +117,7 @@ def test_merge_masks():
     assert "plant" in class_mask_results
 
     # ensure each mask is a NumPy array of the same shape
-    for mask in class_mask_results.values():
-        assert isinstance(mask, bytes)
-        mask_np = np.load(io.BytesIO(mask))
+    for mask_np in class_mask_results.values():
         assert mask_np.dtype == np.uint8
         assert mask_np.shape == (4, 4)
 
