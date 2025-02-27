@@ -47,7 +47,6 @@ def test_process_masking(spark, temp_parquet, tmp_path):
         "plant_mask",
         "sand_mask",
         "wood_mask",
-        "stone_mask",
         "tape_mask",
         "tree_mask",
         "rock_mask",
