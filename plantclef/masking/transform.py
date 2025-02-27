@@ -59,7 +59,7 @@ class WrappedMasking(
         # https://huggingface.co/docs/transformers/main/en/model_doc/sam
         self.sam_model = SamModel.from_pretrained(checkpoint_path_sam).to(self.device)
         self.sam_processor = SamProcessor.from_pretrained(checkpoint_path_sam)
-        # https://huggingface.co/docs/transformers/main/en/model_doc/grounding-dino#transformers.GroundingDinoForObjectDetection
+        # https://huggingface.co/docs/transformers/main/en/model_doc/grounding-dino
         self.groundingdino_model = AutoModelForZeroShotObjectDetection.from_pretrained(
             checkpoint_path_groundingdino
         ).to(self.device)
@@ -124,6 +124,15 @@ class WrappedMasking(
         ).unsqueeze(0)
         return input_boxes
 
+    def _refine_masks(self, masks: torch.BoolTensor) -> List[np.ndarray]:
+        # https://github.com/NielsRogge/Transformers-Tutorials/blob/master/Grounding%20DINO/GroundingDINO_with_Segment_Anything.ipynb
+        masks = masks.cpu().float()
+        masks = masks.permute(0, 2, 3, 1)
+        masks = masks.mean(axis=-1)
+        masks = (masks > 0).int()
+        masks = masks.numpy().astype(np.uint8)
+        return masks
+
     def segment(self, image: Image, input_boxes: torch.tensor) -> np.ndarray:
         inputs = self.sam_processor(
             image, input_boxes=input_boxes, return_tensors="pt"
@@ -136,35 +145,11 @@ class WrappedMasking(
             inputs["original_sizes"].cpu(),
             inputs["reshaped_input_sizes"].cpu(),
         )
-        # convert to numpy
-        return np.array(masks)
+        return self._refine_masks(masks[0])
 
-    def mask_to_bytes(self, image_array: np.ndarray) -> bytes:
-        """Encode the numpy mask array as raw bytes using np.save()."""
-        buffer = io.BytesIO()
-        np.save(buffer, image_array)  # save array to buffer
-        return buffer.getvalue()  # convert buffer to bytes
-
-    def group_masks_by_class(self, masks: np.ndarray, scores: torch.Tensor) -> dict:
-        """Groups segmentation masks by class ID using the highest confidence score."""
-        grouped = {}
-        class_ids = torch.argmax(scores, dim=-1)
-
-        # ensure class_ids is iterable
-        if class_ids.dim() == 0:
-            class_ids = class_ids.unsqueeze(0)
-
-        for mask, class_id in zip(masks, class_ids.tolist()):
-            grouped.setdefault(class_id, []).append(mask)
-
-        return grouped
-
-    def empty_array(self, shape) -> bytes:
-        """Create an empty numpy mask (H, W) and returns it as bytes."""
-        empty_mask = np.zeros((shape[0], shape[1]), dtype=np.uint8)
-        return self.mask_to_bytes(empty_mask)  # store as raw bytes
-
-    def merge_masks(self, grouped_masks: dict, empty_shape) -> tuple:
+    def merge_masks(
+        self, masks: np.ndarray, text_labels: list[str], empty_shape: tuple
+    ) -> tuple:
         """Merges masks for each class and prepares the output dictionary."""
 
         class_masks = {
@@ -172,18 +157,11 @@ class WrappedMasking(
             for key in ["leaf", "flower", "plant"]
         }
 
-        for class_id, masks in grouped_masks.items():
-            if not masks or class_id not in self.INCLUDE_CLASS_IDS:
-                continue
-            class_name = self.CLASSES[class_id]
-            for mask in masks:
-                # ensure mask has the correct shape (H, W)
-                if mask.ndim == 4:  # if shape is (B, C, H, W)
-                    mask = mask[0, 0]  # take first batch and first channel
-                elif mask.ndim == 3:  # if shape is (C, H, W)
-                    mask = mask[0]  # take first channel
-                # perform in-place bitwise OR (|=) operation
-                class_masks[class_name] |= mask
+        for text_label, mask in zip(text_labels, masks):
+            for key in class_masks.keys():
+                if key not in text_label:
+                    continue
+                class_masks[key] |= mask
 
         final_mask = np.zeros(empty_shape, dtype=np.uint8)
         for _, mask in class_masks.items():
@@ -198,6 +176,12 @@ class WrappedMasking(
 
         return final_mask, class_masks
 
+    def mask_to_bytes(self, image_array: np.ndarray) -> bytes:
+        """Encode the numpy mask array as raw bytes using np.save()."""
+        buffer = io.BytesIO()
+        np.save(buffer, image_array)  # save array to buffer
+        return buffer.getvalue()  # convert buffer to bytes
+
     def _make_predict_fn(self):
         """Return PredictBatchFunction using a closure over the model"""
 
@@ -207,13 +191,12 @@ class WrappedMasking(
         def predict(input_image: np.ndarray) -> np.ndarray:
             # convert binary to RGB
             image = Image.open(io.BytesIO(input_image)).convert("RGB")
-            detections = self.detect(image)  # returns dictionary of detections
+            detections = self.detect(image)  # dictionary of the detections
             input_boxes = self.convert_boxes_to_tensor(detections)
             masks = self.segment(image, input_boxes=input_boxes)
 
-            grouped_masks = self.group_masks_by_class(masks, detections["scores"])
             final_mask, class_masks = self.merge_masks(
-                grouped_masks, (image.height, image.width)
+                masks, detections["text_labels"], (image.height, image.width)
             )
 
             return {
