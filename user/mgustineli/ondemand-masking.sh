@@ -21,8 +21,8 @@ nvidia_logs_pid=$!
 echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
 
 # Set environment variables
-export PYSPARK_DRIVER_MEMORY=10g
-export PYSPARK_EXECUTOR_MEMORY=10g
+export PYSPARK_DRIVER_MEMORY=20g
+export PYSPARK_EXECUTOR_MEMORY=20g
 export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Define paths
@@ -34,7 +34,7 @@ dataset_name=test_2024_subset20
 plantclef masking workflow \
     $project_data_dir/parquet/$dataset_name \
     $project_data_dir/masking/$dataset_name \
-    --cpu-count 1 \
+    --cpu-count 2 \
     --batch-size 1 \
     --num-sample-ids 1 \
     --sample-id 0

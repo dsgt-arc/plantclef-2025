@@ -196,8 +196,9 @@ def plot_masks_from_binary(
 
 def plot_individual_masks_comparison(
     joined_df,
-    label_col: str,
-    grid_size=(3, 5),
+    mask_names: list = ["leaf_mask", "flower_mask", "rock_mask"],
+    label_col: str = "image_name",
+    num_rows: int = 3,
     crop_square: bool = False,
     figsize: tuple = (15, 10),
     fontsize: int = 16,
@@ -208,6 +209,7 @@ def plot_individual_masks_comparison(
     Display masks in a grid with image names as labels.
 
     :param joined_df: DataFrame with the original and masked data.
+    :param mask_names: List of mask names to plot individually.
     :param label_col: Name of the species being displayed as image labels.
     :param grid_size: Tuple (rows, cols) representing the grid size.
     :param crop_square: Boolean, whether to crop images to a square format by taking the center.
@@ -215,16 +217,16 @@ def plot_individual_masks_comparison(
     :param dpi: Dots Per Inch, determines the resolution of the output image.
     """
     # Unpack the number of rows and columns for the grid
-    rows, cols = grid_size
+    cols = len(mask_names) + 1
 
     # Collect binary image data from DataFrame
-    subset_df = joined_df.limit(rows).collect()
+    subset_df = joined_df.limit(num_rows).collect()
 
     # Create subplots for image and masks
-    fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=dpi)
+    fig, axes = plt.subplots(num_rows, cols, figsize=figsize, dpi=dpi)
 
     # Ensure axes is always 2D for consistent iteration
-    axes = axes.reshape(rows, cols)
+    axes = axes.reshape(num_rows, cols)
 
     for row_idx, row in enumerate(subset_df):
         # Load original image
@@ -232,7 +234,6 @@ def plot_individual_masks_comparison(
         image_array = np.array(image)
 
         # Load masks
-        mask_names = ["leaf_mask", "flower_mask", "plant_mask", "combined_mask"]
         masks = [np.load(io.BytesIO(row[mask])) for mask in mask_names]
 
         # Expand masks to match image dimensions
@@ -246,7 +247,7 @@ def plot_individual_masks_comparison(
 
         # Plot each mask
         for col_idx, (mask, mask_name) in enumerate(zip(masks, mask_names), start=1):
-            masked_image = image_array * mask
+            masked_image = image_array * (mask * 255)
             axes[row_idx, col_idx].imshow(masked_image.astype(np.uint8))
             name = mask_name.replace("_", " ").title()
             wrap_mask_name = "\n".join(textwrap.wrap(name, width=wrap_width))

@@ -9,11 +9,6 @@ from pyspark.sql import functions as F
 
 from plantclef.masking.transform import WrappedMasking
 from plantclef.spark import spark_resource
-from plantclef.model_setup import (
-    setup_segment_anything_checkpoint_path,
-    setup_groundingdino_checkpoint_path,
-    setup_groundingdino_config_path,
-)
 
 
 class ProcessMasking(luigi.Task):
@@ -72,10 +67,16 @@ class ProcessMasking(luigi.Task):
                 transformed = transformed.withColumn(c, vector_to_array(F.col(c)))
 
         transformed = (
-            transformed.withColumn("combined_mask", F.col("masks.combined_mask"))
-            .withColumn("leaf_mask", F.col("masks.leaf_mask"))
+            transformed.withColumn("leaf_mask", F.col("masks.leaf_mask"))
             .withColumn("flower_mask", F.col("masks.flower_mask"))
             .withColumn("plant_mask", F.col("masks.plant_mask"))
+            .withColumn("sand_mask", F.col("masks.sand_mask"))
+            .withColumn("wood_mask", F.col("masks.wood_mask"))
+            .withColumn("stone_mask", F.col("masks.stone_mask"))
+            .withColumn("tape_mask", F.col("masks.tape_mask"))
+            .withColumn("tree_mask", F.col("masks.tree_mask"))
+            .withColumn("rock_mask", F.col("masks.rock_mask"))
+            .withColumn("vegetation_mask", F.col("masks.vegetation_mask"))
             .drop("masks")
         )
 

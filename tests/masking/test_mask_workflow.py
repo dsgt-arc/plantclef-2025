@@ -42,10 +42,16 @@ def test_process_masking(spark, temp_parquet, tmp_path):
     assert transformed.count() == 1
     assert transformed.columns == [
         "image_name",
-        "combined_mask",
         "leaf_mask",
         "flower_mask",
         "plant_mask",
+        "sand_mask",
+        "wood_mask",
+        "stone_mask",
+        "tape_mask",
+        "tree_mask",
+        "rock_mask",
+        "vegetation_mask",
         "sample_id",
     ]
     row = transformed.select("leaf_mask").first()
