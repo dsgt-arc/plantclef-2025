@@ -202,7 +202,7 @@ class WrappedMasking(
         def predict(input_image: np.ndarray) -> np.ndarray:
             # convert binary to RGB
             image = Image.open(io.BytesIO(input_image)).convert("RGB")
-            detections = self.detect(image)  # returns list of dictionaries
+            detections = self.detect(image)  # returns dictionary of detections
             input_boxes = self.convert_boxes_to_tensor(detections)
             masks = self.segment(image, input_boxes=input_boxes)
 
