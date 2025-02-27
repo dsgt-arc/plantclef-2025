@@ -167,13 +167,6 @@ class WrappedMasking(
         for _, mask in class_masks.items():
             final_mask |= mask
 
-        # print size of the final mask and mask results
-        # TODO: remove this later
-        if True:
-            print(f"\ncombined mask size: {final_mask.shape}", flush=True)
-            for k, v in class_masks.items():
-                print(f"{k} mask size: {v.shape}", flush=True)
-
         return final_mask, class_masks
 
     def mask_to_bytes(self, image_array: np.ndarray) -> bytes:
