@@ -1,12 +1,20 @@
 import io
 import math
+import textwrap
 
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
 
-def plot_images_from_binary(df, data_col: str, image_col: str, grid_size=(3, 3)):
+def plot_images_from_binary(
+    df,
+    data_col: str,
+    image_col: str,
+    grid_size=(3, 3),
+    crop_square: bool = False,
+    figsize: tuple = (12, 12),
+):
     """
     Display images in a grid with binomial names as labels.
 
@@ -14,6 +22,8 @@ def plot_images_from_binary(df, data_col: str, image_col: str, grid_size=(3, 3))
     :param data_col: Name of the data column.
     :param image_col: Name of the species being displayed as image labels.
     :param grid_size: Tuple (rows, cols) representing the grid size.
+    :param crop_square: Boolean, whether to crop images to a square format by taking the center.
+    :param figsize: Regulates the size of the figure.
     """
     # Unpack the number of rows and columns for the grid
     rows, cols = grid_size
@@ -24,7 +34,7 @@ def plot_images_from_binary(df, data_col: str, image_col: str, grid_size=(3, 3))
     image_names = [row[image_col] for row in subset_df]
 
     # Create a matplotlib subplot with the specified grid size
-    fig, axes = plt.subplots(rows, cols, figsize=(12, 12), dpi=80)
+    fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=200)
 
     # Flatten the axes array for easy iteration if it's 2D
     axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
@@ -32,12 +42,28 @@ def plot_images_from_binary(df, data_col: str, image_col: str, grid_size=(3, 3))
     for ax, binary_data, name in zip(axes, image_data_list, image_names):
         # Convert binary data to an image and display it
         image = Image.open(io.BytesIO(binary_data))
+
+        # Crop image to square if required
+        if crop_square:
+            min_dim = min(image.size)  # Get the smallest dimension
+            width, height = image.size
+            left = (width - min_dim) / 2
+            top = (height - min_dim) / 2
+            right = (width + min_dim) / 2
+            bottom = (height + min_dim) / 2
+            image = image.crop((left, top, right, bottom))
+
         ax.imshow(image)
         name = name.replace("_", " ")
-        ax.set_xlabel(name)  # Set the binomial name as xlabel
-        ax.xaxis.label.set_size(14)  # Set the font size for the xlabel
+        wrapped_name = "\n".join(textwrap.wrap(name, width=25))
+        ax.set_title(wrapped_name, fontsize=16, pad=1)
+        # ax.set_xlabel(name)  # Set the binomial name as xlabel
+        # ax.xaxis.label.set_size(14)  # Set the font size for the xlabel
         ax.set_xticks([])
         ax.set_yticks([])
+        spines = ["top", "right", "bottom", "left"]
+        for s in spines:
+            ax.spines[s].set_visible(False)
     plt.tight_layout()
     plt.show()
 

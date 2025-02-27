@@ -177,11 +177,24 @@ class WrappedMasking(
                 continue
             class_name = self.CLASSES[class_id]
             for mask in masks:
+                # ensure mask has the correct shape (H, W)
+                if mask.ndim == 4:  # if shape is (B, C, H, W)
+                    mask = mask[0, 0]  # take first batch and first channel
+                elif mask.ndim == 3:  # if shape is (C, H, W)
+                    mask = mask[0]  # take first channel
+                # perform in-place bitwise OR (|=) operation
                 class_masks[class_name] |= mask
 
         final_mask = np.zeros(empty_shape, dtype=np.uint8)
         for _, mask in class_masks.items():
             final_mask |= mask
+
+        # print size of the final mask and mask results
+        # TODO: remove this later
+        if True:
+            print(f"\ncombined mask size: {final_mask.shape}", flush=True)
+            for k, v in class_masks.items():
+                print(f"{k} mask size: {v.shape}", flush=True)
 
         return final_mask, class_masks
 
@@ -202,13 +215,6 @@ class WrappedMasking(
             final_mask, class_masks = self.merge_masks(
                 grouped_masks, (image.height, image.width)
             )
-
-            # print size of the final mask and mask results
-            # TODO: remove this later
-            if True:
-                print(f"Final mask size: {final_mask.shape}", flush=True)
-                for k, v in class_masks.items():
-                    print(f"{k} mask size: {v.shape}", flush=True)
 
             return {
                 "combined_mask": self.mask_to_bytes(final_mask),
