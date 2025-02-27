@@ -167,31 +167,23 @@ class WrappedMasking(
     def merge_masks(self, grouped_masks: dict, empty_shape) -> tuple:
         """Merges masks for each class and prepares the output dictionary."""
 
-        empty_mask = np.zeros(empty_shape, dtype=np.uint8)
-        empty_mask_bytes = self.mask_to_bytes(empty_mask)
-
-        class_mask_results = {
-            "leaf": empty_mask_bytes,
-            "flower": empty_mask_bytes,
-            "plant": empty_mask_bytes,
+        class_masks = {
+            key: np.zeros(empty_shape, dtype=np.uint8)
+            for key in ["leaf", "flower", "plant"]
         }
 
-        merged_masks = []
         for class_id, masks in grouped_masks.items():
-            if class_id in self.INCLUDE_CLASS_IDS and len(masks) > 0:
-                merged_mask = np.any(np.stack(masks, axis=0), axis=0).astype(np.uint8)
-                merged_mask = np.squeeze(merged_mask)  # ensure (H, W)
-                merged_masks.append(merged_mask)
-                class_name = self.CLASSES[class_id]
-                class_mask_results[class_name] = self.mask_to_bytes(merged_mask)
+            if not masks or class_id not in self.INCLUDE_CLASS_IDS:
+                continue
+            class_name = self.CLASSES[class_id]
+            for mask in masks:
+                class_masks[class_name] |= mask
 
-        if merged_masks:
-            final_mask = np.any(np.stack(merged_masks, axis=0), axis=0).astype(np.uint8)
-            final_mask_bytes = self.mask_to_bytes(final_mask)
-        else:
-            final_mask_bytes = empty_mask_bytes
+        final_mask = np.zeros(empty_shape, dtype=np.uint8)
+        for _, mask in class_masks.items():
+            final_mask |= mask
 
-        return final_mask_bytes, class_mask_results
+        return final_mask, class_masks
 
     def _make_predict_fn(self):
         """Return PredictBatchFunction using a closure over the model"""
@@ -206,24 +198,29 @@ class WrappedMasking(
             input_boxes = self.convert_boxes_to_tensor(detections)
             masks = self.segment(image, input_boxes=input_boxes)
 
-            empty_shape = image.size[::-1]  # extract (H, W)
             grouped_masks = self.group_masks_by_class(masks, detections["scores"])
-            final_mask_bytes, class_mask_results = self.merge_masks(
-                grouped_masks, empty_shape
+            final_mask, class_masks = self.merge_masks(
+                grouped_masks, (image.height, image.width)
             )
 
+            # print size of the final mask and mask results
+            # TODO: remove this later
+            if True:
+                print(f"Final mask size: {final_mask.shape}", flush=True)
+                for k, v in class_masks.items():
+                    print(f"{k} mask size: {v.shape}", flush=True)
+
             return {
-                "combined_mask": final_mask_bytes,
-                **{f"{k}_mask": v for k, v in class_mask_results.items()},
+                "combined_mask": self.mask_to_bytes(final_mask),
+                **{f"{k}_mask": self.mask_to_bytes(v) for k, v in class_masks.items()},
             }
 
         return predict
 
     def _transform(self, df: DataFrame):
-        predict_fn = self._make_predict_fn()
         predict_udf = F.udf(
-            predict_fn,
-            StructType(
+            self._make_predict_fn(),
+            returnType=StructType(
                 [
                     StructField("combined_mask", BinaryType(), False),
                     StructField("leaf_mask", BinaryType(), False),
