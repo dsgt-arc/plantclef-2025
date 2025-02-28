@@ -5,11 +5,6 @@ from typing_extensions import Annotated
 from plantclef.spark import spark_resource
 
 
-logging.basicConfig(level=logging.INFO)
-
-logger = logging.getLogger(__name__)
-
-
 class ProcessTest(luigi.Task):
     """Task to process embeddings."""
 
@@ -25,9 +20,9 @@ class ProcessTest(luigi.Task):
             with spark_resource() as spark:
                 df = spark.read.parquet(self.input_path)
                 df.printSchema()  # This should print, but may be suppressed
-                logger.info("Schema printed successfully")
+                logging.info("Schema printed successfully")
         except Exception as e:
-            logger.error(f"Spark job failed: {e}")
+            logging.error(f"Spark job failed: {e}")
 
 
 class Workflow(luigi.WrapperTask):
@@ -44,12 +39,12 @@ class Workflow(luigi.WrapperTask):
         else:
             sample_ids = list(range(self.num_tasks))
 
-        logger.info("Creating tasks...")
-        logger.info(f"Sample IDs: {sample_ids}")
+        logging.info("Creating tasks...")
+        logging.info(f"Sample IDs: {sample_ids}")
 
         tasks = []
         for sample_id in sample_ids:
-            logger.info(f"Creating task for sample_id: {sample_id}")
+            logging.info(f"Creating task for sample_id: {sample_id}")
             task = ProcessTest(
                 input_path=self.input_path,
                 output_path=self.output_path,
@@ -66,6 +61,9 @@ def main(
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
     logger.info("Starting workflow execution...")
     logger.info(f"Input path: {input_path}")
     logger.info(f"Output path: {output_path}")
