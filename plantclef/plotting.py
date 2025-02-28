@@ -253,7 +253,9 @@ def plot_individual_masks_comparison(
         image_array = np.array(image)
 
         # Load masks
-        masks = {mask_name: np.load((row[mask_name])) for mask_name in mask_names}
+        masks = {
+            mask_name: deserialize_mask(row[mask_name]) for mask_name in mask_names
+        }
 
         # crop image to square if required
         if crop_square:
@@ -365,8 +367,6 @@ def plot_species_histogram(df, species_count: int = 100, bar_width: float = 0.8)
 def plot_mask_percentage(
     joined_df,
     image_name: str = "CBN-Pyr-03-20230706.jpg",
-    positive_classes: list = ["leaf_mask", "flower_mask"],
-    crop_square: bool = False,
     figsize: tuple = (15, 10),
     fontsize: int = 16,
     wrap_width: int = 15,
@@ -382,10 +382,10 @@ def plot_mask_percentage(
     # Load the original image
     # img_fp = BytesIO(row["data"])  # Adjust column name accordingly
     # img = Image.open(img_fp)
-    selected_df = joined_df.where(F.col("image_name").isin(image_name))
-    mask_cols = [c for c in selected_df.columns if "mask" in c]
-    row = joined_df.first()
+    selected_df = joined_df.where(F.col("image_name") == image_name)
+    row = selected_df.first()
     img = deserialize_image(row.data)
+    mask_cols = [c for c in selected_df.columns if "mask" in c]
 
     # Left: Display original image
     ax_img = fig.add_subplot(top_gs[0, 0])
@@ -397,12 +397,15 @@ def plot_mask_percentage(
 
     # Right: Display tabular information
     ax_table = fig.add_subplot(top_gs[0, 1])
+    data = {}
     for col in mask_cols:
-        data = {col: deserialize_mask(row[col])}
-    pdf = pd.DataFrame(data, columns=["mask", "percentage"])
+        mask = deserialize_mask(row[col])
+        data[col] = mask.mean()
+    pdf = pd.DataFrame(list(data.items()), columns=["mask", "percentage"])
 
     # plot as a table using at most 3 decimal places
     ax_table.axis("off")
+    pdf["mask"] = pdf["mask"].str.replace("_", " ").str.title()
     ax_table.table(
         cellText=pdf.round(3).values,
         colLabels=pdf.columns,
@@ -420,10 +423,12 @@ def plot_mask_percentage(
 
         ax = fig.add_subplot(ax_pos)
         ax.imshow(mask, cmap="gray")
-        ax.set_title(col)
+        col_name = col.replace("_", " ").title()
+        wrapped_name = "\n".join(textwrap.wrap(col_name, width=wrap_width))
+        ax.set_title(wrapped_name, fontsize=fontsize, pad=1)
         ax.axis("off")
+        # ax.set_title(col)
 
     # Adjust layout and display
     plt.tight_layout()
     plt.show()
-    # return fig
