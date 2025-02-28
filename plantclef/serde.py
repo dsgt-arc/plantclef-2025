@@ -19,14 +19,18 @@ def serialize_image(image: Image.Image) -> bytes:
     return buffer.getvalue()
 
 
-def deserialize_mask(bytes: bytes) -> np.ndarray:
+def deserialize_mask(bytes: bytes, use_compression=True) -> np.ndarray:
     """Decode the numpy mask array from raw bytes using np.load()."""
-    buffer = io.BytesIO(zlib.decompress(bytes))
-    return np.load(buffer)
+    if use_compression:
+        bytes = zlib.decompress(bytes)
+    return np.load(io.BytesIO(bytes))
 
 
-def serialize_mask(mask: np.ndarray) -> bytes:
+def serialize_mask(mask: np.ndarray, use_compression=True) -> bytes:
     """Encode the numpy mask array as raw bytes using np.save()."""
     buffer = io.BytesIO()
     np.save(buffer, mask)
-    return zlib.compress(buffer.getvalue())
+    value = buffer.getvalue()
+    if use_compression:
+        value = zlib.compress(value)
+    return value
