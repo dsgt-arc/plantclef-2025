@@ -9,11 +9,6 @@ from pyspark.sql import functions as F
 
 from plantclef.masking.transform import WrappedMasking
 from plantclef.spark import spark_resource
-from plantclef.model_setup import (
-    setup_segment_anything_checkpoint_path,
-    setup_groundingdino_checkpoint_path,
-    setup_groundingdino_config_path,
-)
 
 
 class ProcessMasking(luigi.Task):
@@ -22,7 +17,6 @@ class ProcessMasking(luigi.Task):
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
     cpu_count = luigi.IntParameter(default=4)
-    batch_size = luigi.IntParameter(default=32)
     num_partitions = luigi.OptionalIntParameter(default=20)
     # we break the dataset into a number of samples that are processed in parallel
     sample_col = luigi.Parameter(default="image_name")
@@ -52,7 +46,6 @@ class ProcessMasking(luigi.Task):
                     output_col="masks",
                     checkpoint_path_sam=self.checkpoint_path_sam,
                     checkpoint_path_groundingdino=self.checkpoint_path_groundingdino,
-                    batch_size=self.batch_size,
                 ),
                 SQLTransformer(statement=self.sql_statement),
             ]
@@ -72,10 +65,15 @@ class ProcessMasking(luigi.Task):
                 transformed = transformed.withColumn(c, vector_to_array(F.col(c)))
 
         transformed = (
-            transformed.withColumn("combined_mask", F.col("masks.combined_mask"))
-            .withColumn("leaf_mask", F.col("masks.leaf_mask"))
+            transformed.withColumn("leaf_mask", F.col("masks.leaf_mask"))
             .withColumn("flower_mask", F.col("masks.flower_mask"))
             .withColumn("plant_mask", F.col("masks.plant_mask"))
+            .withColumn("sand_mask", F.col("masks.sand_mask"))
+            .withColumn("wood_mask", F.col("masks.wood_mask"))
+            .withColumn("tape_mask", F.col("masks.tape_mask"))
+            .withColumn("tree_mask", F.col("masks.tree_mask"))
+            .withColumn("rock_mask", F.col("masks.rock_mask"))
+            .withColumn("vegetation_mask", F.col("masks.vegetation_mask"))
             .drop("masks")
         )
 
@@ -121,7 +119,6 @@ class Workflow(luigi.WrapperTask):
     sample_id = luigi.OptionalParameter()
     num_sample_ids = luigi.IntParameter(default=20)
     cpu_count = luigi.IntParameter(default=6)
-    batch_size = luigi.IntParameter(default=32)
     num_partitions = luigi.IntParameter(default=20)
 
     def requires(self):
@@ -129,7 +126,7 @@ class Workflow(luigi.WrapperTask):
         if self.sample_id is not None:
             sample_ids = [self.sample_id]
         else:
-            sample_ids = list(range(self.num_tasks))
+            sample_ids = list(range(self.num_sample_ids))
 
         tasks = []
         for sample_id in sample_ids:
@@ -137,7 +134,6 @@ class Workflow(luigi.WrapperTask):
                 input_path=self.input_path,
                 output_path=self.output_path,
                 cpu_count=self.cpu_count,
-                batch_size=self.batch_size,
                 num_partitions=self.num_partitions,
                 sample_id=sample_id,
                 num_sample_ids=self.num_sample_ids,
@@ -150,9 +146,9 @@ def main(
     input_path: Annotated[str, typer.Argument(help="Input root directory")],
     output_path: Annotated[str, typer.Argument(help="Output root directory")],
     cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 8,
-    batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
+    num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 20,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
     # run the workflow
@@ -168,9 +164,9 @@ def main(
                 input_path=input_path,
                 output_path=output_path,
                 cpu_count=cpu_count,
-                batch_size=batch_size,
                 num_sample_ids=num_sample_ids,
                 sample_id=sample_id,
+                num_partitions=num_partitions,
             )
         ],
         **kwargs,

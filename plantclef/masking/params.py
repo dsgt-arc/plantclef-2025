@@ -43,25 +43,3 @@ class HasCheckpointPathGroundingDINO(Param):
 
     def getCheckpointPathGroundingDINO(self) -> str:
         return self.getOrDefault(self.checkpointPathGroundingDINO)
-
-
-class HasBatchSize(Param):
-    """
-    Mixin for param batch_size: int
-    """
-
-    batchSize = Param(
-        Params._dummy(),
-        "batchSize",
-        "The batch size to use for embedding extraction",
-        typeConverter=TypeConverters.toInt,
-    )
-
-    def __init__(self):
-        super().__init__(
-            default=32,
-            doc="The batch size to use for embedding extraction",
-        )
-
-    def getBatchSize(self) -> int:
-        return self.getOrDefault(self.batchSize)

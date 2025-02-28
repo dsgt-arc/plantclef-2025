@@ -2,11 +2,6 @@ import typer
 import logging
 from typing_extensions import Annotated
 
-logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
-
 
 def main(
     input_path: Annotated[str, typer.Argument(help="Input root directory")],
@@ -14,6 +9,11 @@ def main(
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
+    logging.basicConfig(
+        level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+    logger = logging.getLogger(__name__)
+
     logger.info("Starting workflow execution...")
     logger.info(f"Input path: {input_path}")
     logger.info(f"Output path: {output_path}")

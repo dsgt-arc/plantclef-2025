@@ -10,11 +10,8 @@ from transformers import (
 )
 from typing import List
 
-from .params import (
-    HasCheckpointPathSAM,
-    HasCheckpointPathGroundingDINO,
-    HasBatchSize,
-)
+from ..serde import serialize_mask
+from .params import HasCheckpointPathSAM, HasCheckpointPathGroundingDINO
 
 from pyspark.ml import Transformer
 from pyspark.ml.param.shared import HasInputCol, HasOutputCol
@@ -30,7 +27,6 @@ class WrappedMasking(
     HasOutputCol,
     HasCheckpointPathSAM,
     HasCheckpointPathGroundingDINO,
-    HasBatchSize,
     DefaultParamsReadable,
     DefaultParamsWritable,
 ):
@@ -44,7 +40,6 @@ class WrappedMasking(
         output_col: str = "masks",
         checkpoint_path_sam: str = "facebook/sam-vit-huge",
         checkpoint_path_groundingdino: str = "IDEA-Research/grounding-dino-base",
-        batch_size: int = 32,
     ):
         super().__init__()
         self._setDefault(
@@ -53,7 +48,6 @@ class WrappedMasking(
             # NOTE: these are more ids than they are checkpoint paths
             checkpointPathSAM=checkpoint_path_sam,
             checkpointPathGroundingDINO=checkpoint_path_groundingdino,
-            batchSize=batch_size,
         )
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # https://huggingface.co/docs/transformers/main/en/model_doc/sam
@@ -73,7 +67,6 @@ class WrappedMasking(
             "plant",
             "sand",
             "wood",
-            "stone",
             "tape",
             "tree",
             "rock",
@@ -81,8 +74,6 @@ class WrappedMasking(
         ]
         self.BOX_THRESHOLD = 0.15
         self.TEXT_THRESHOLD = 0.1
-        self.INCLUDE_CLASS_IDS = {0, 1, 2}
-        self.INITIALIZED = True
 
     def _nvidia_smi(self):
         from subprocess import run, PIPE
@@ -147,33 +138,24 @@ class WrappedMasking(
         )
         return self._refine_masks(masks[0])
 
-    def merge_masks(
+    def merge_class_masks(
         self, masks: np.ndarray, text_labels: list[str], empty_shape: tuple
     ) -> tuple:
         """Merges masks for each class and prepares the output dictionary."""
-
+        # create empty np arrays for empty masks
         class_masks = {
-            key: np.zeros(empty_shape, dtype=np.uint8)
-            for key in ["leaf", "flower", "plant"]
+            key: np.zeros(empty_shape, dtype=np.uint8) for key in self.CLASSES
         }
 
+        # return all masks
         for text_label, mask in zip(text_labels, masks):
             for key in class_masks.keys():
                 if key not in text_label:
                     continue
+                # merge multiple masks into a single mask
                 class_masks[key] |= mask
 
-        final_mask = np.zeros(empty_shape, dtype=np.uint8)
-        for _, mask in class_masks.items():
-            final_mask |= mask
-
-        return final_mask, class_masks
-
-    def mask_to_bytes(self, image_array: np.ndarray) -> bytes:
-        """Encode the numpy mask array as raw bytes using np.save()."""
-        buffer = io.BytesIO()
-        np.save(buffer, image_array)  # save array to buffer
-        return buffer.getvalue()  # convert buffer to bytes
+        return class_masks
 
     def _make_predict_fn(self):
         """Return PredictBatchFunction using a closure over the model"""
@@ -188,13 +170,12 @@ class WrappedMasking(
             input_boxes = self.convert_boxes_to_tensor(detections)
             masks = self.segment(image, input_boxes=input_boxes)
 
-            final_mask, class_masks = self.merge_masks(
+            class_masks = self.merge_class_masks(
                 masks, detections["text_labels"], (image.height, image.width)
             )
 
             return {
-                "combined_mask": self.mask_to_bytes(final_mask),
-                **{f"{k}_mask": self.mask_to_bytes(v) for k, v in class_masks.items()},
+                **{f"{k}_mask": serialize_mask(v) for k, v in class_masks.items()},
             }
 
         return predict
@@ -204,10 +185,15 @@ class WrappedMasking(
             self._make_predict_fn(),
             returnType=StructType(
                 [
-                    StructField("combined_mask", BinaryType(), False),
                     StructField("leaf_mask", BinaryType(), False),
                     StructField("flower_mask", BinaryType(), False),
                     StructField("plant_mask", BinaryType(), False),
+                    StructField("sand_mask", BinaryType(), False),
+                    StructField("wood_mask", BinaryType(), False),
+                    StructField("tape_mask", BinaryType(), False),
+                    StructField("tree_mask", BinaryType(), False),
+                    StructField("rock_mask", BinaryType(), False),
+                    StructField("vegetation_mask", BinaryType(), False),
                 ]
             ),
         )

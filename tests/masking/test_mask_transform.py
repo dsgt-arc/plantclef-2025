@@ -1,7 +1,6 @@
-import io
 import numpy as np
-from PIL import Image
 from plantclef.masking.transform import WrappedMasking
+from plantclef.serde import deserialize_mask, deserialize_image
 
 
 def test_wrapped_mask_detect(test_image):
@@ -21,29 +20,31 @@ def test_wrapped_mask_segment(test_image):
     model = WrappedMasking()
     detections = model.detect(test_image)
     input_boxes = model.convert_boxes_to_tensor(detections)
-    print(f"input_boxes: {input_boxes.shape}")
+    print(f"input boxes shape: {input_boxes.shape}")
     # torch.Size([1, 42, 4])
     masks = model.segment(test_image, input_boxes=input_boxes)
     # (1, 42, 3, 3024, 3024)
     assert len(masks) > 0
     assert masks.shape == (42, 3024, 3024)
-    print(masks)
+    print(f"masks: {masks}")
 
 
-def test_merge_masks(test_image):
+def test_merge_class_masks(test_image):
     model = WrappedMasking()
     detections = model.detect(test_image)
     input_boxes = model.convert_boxes_to_tensor(detections)
     masks = model.segment(test_image, input_boxes=input_boxes)
     # assert all the masks are the same shape
-    combined_mask, class_masks = model.merge_masks(
+    class_masks = model.merge_class_masks(
         masks, detections["text_labels"], (test_image.height, test_image.width)
     )
+    print(f"all mask classes: {class_masks.keys()}")
+    print(f"rock mask: {class_masks['rock']}")
     for key, mask in class_masks.items():
-        assert mask.shape == combined_mask.shape
+        assert mask.shape == class_masks["leaf"].shape
         assert mask.dtype == np.uint8
-    assert combined_mask.shape == (test_image.height, test_image.width)
-    assert combined_mask.dtype == np.uint8
+    assert class_masks["leaf"].shape == (test_image.height, test_image.width)
+    assert class_masks["leaf"].dtype == np.uint8
 
 
 def test_wrapped_mask(spark_df):
@@ -59,19 +60,22 @@ def test_wrapped_mask(spark_df):
     row = transformed.select("masks").first()
 
     # ensure that the output mask is a NumPy array
-    print(f"combined mask type: {type(row.masks['combined_mask'])}")
-    assert isinstance(row.masks["combined_mask"], bytearray)
+    print(f"combined mask type: {type(row.masks['leaf_mask'])}")
+    assert isinstance(row.masks["leaf_mask"], bytearray)
 
     # decode the bytes back into a NumPy array
-    mask = np.load(io.BytesIO(row.masks["combined_mask"]))
+    mask = deserialize_mask(row.masks["leaf_mask"])
+    rock_mask = deserialize_mask(row.masks["rock_mask"])
 
     # ensure the mask is a NumPy array
     assert isinstance(mask, np.ndarray)
+    assert isinstance(rock_mask, np.ndarray)
     assert mask.dtype == np.uint8
+    assert rock_mask.dtype == np.uint8
 
     # ensure mask has the expected dimensions (same as input image)
     img_data = spark_df.select("data").first().data
-    img = Image.open(io.BytesIO(img_data))
+    img = deserialize_image(img_data)
     expected_shape = img.size[::-1]
     assert mask.shape == expected_shape
 
