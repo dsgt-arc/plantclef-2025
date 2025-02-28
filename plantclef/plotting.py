@@ -1,10 +1,10 @@
-import io
 import math
 import textwrap
 
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
+from .serde import deserialize_image, deserialize_mask
 
 
 def crop_image_square(image: Image.Image) -> np.ndarray:
@@ -65,7 +65,7 @@ def plot_images_from_binary(
 
     for ax, binary_data, name in zip(axes, image_data_list, image_names):
         # Convert binary data to an image and display it
-        image = Image.open(io.BytesIO(binary_data))
+        image = deserialize_image(binary_data)
 
         # Crop image to square if required
         if crop_square:
@@ -189,9 +189,9 @@ def plot_masks_from_binary(
         axes, image_data, mask_image_data, image_names
     ):
         # Convert binary data to an image
-        image = Image.open(io.BytesIO(binary_data))
+        image = deserialize_image(binary_data)
         image_array = np.array(image)
-        mask_array = np.load(io.BytesIO(mask_binary_data))
+        mask_array = deserialize_mask(mask_binary_data)
         mask_array = np.expand_dims(mask_array, axis=-1)
         mask_array = np.repeat(mask_array, 3, axis=-1)
         mask_img = image_array * mask_array
@@ -247,13 +247,11 @@ def plot_individual_masks_comparison(
 
     for row_idx, row in enumerate(subset_df):
         # load original image
-        image = Image.open(io.BytesIO(row["data"])).convert("RGB")
+        image = deserialize_image(row["data"]).convert("RGB")
         image_array = np.array(image)
 
         # Load masks
-        masks = {
-            mask_name: np.load(io.BytesIO(row[mask_name])) for mask_name in mask_names
-        }
+        masks = {mask_name: np.load((row[mask_name])) for mask_name in mask_names}
 
         # crop image to square if required
         if crop_square:

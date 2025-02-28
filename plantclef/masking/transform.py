@@ -10,11 +10,8 @@ from transformers import (
 )
 from typing import List
 
-from .params import (
-    HasCheckpointPathSAM,
-    HasCheckpointPathGroundingDINO,
-    HasBatchSize,
-)
+from ..serde import serialize_mask
+from .params import HasCheckpointPathSAM, HasCheckpointPathGroundingDINO
 
 from pyspark.ml import Transformer
 from pyspark.ml.param.shared import HasInputCol, HasOutputCol
@@ -30,7 +27,6 @@ class WrappedMasking(
     HasOutputCol,
     HasCheckpointPathSAM,
     HasCheckpointPathGroundingDINO,
-    HasBatchSize,
     DefaultParamsReadable,
     DefaultParamsWritable,
 ):
@@ -44,7 +40,6 @@ class WrappedMasking(
         output_col: str = "masks",
         checkpoint_path_sam: str = "facebook/sam-vit-huge",
         checkpoint_path_groundingdino: str = "IDEA-Research/grounding-dino-base",
-        batch_size: int = 32,
     ):
         super().__init__()
         self._setDefault(
@@ -53,7 +48,6 @@ class WrappedMasking(
             # NOTE: these are more ids than they are checkpoint paths
             checkpointPathSAM=checkpoint_path_sam,
             checkpointPathGroundingDINO=checkpoint_path_groundingdino,
-            batchSize=batch_size,
         )
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # https://huggingface.co/docs/transformers/main/en/model_doc/sam
@@ -163,12 +157,6 @@ class WrappedMasking(
 
         return class_masks
 
-    def mask_to_bytes(self, image_array: np.ndarray) -> bytes:
-        """Encode the numpy mask array as raw bytes using np.save()."""
-        buffer = io.BytesIO()
-        np.save(buffer, image_array)  # save array to buffer
-        return buffer.getvalue()  # convert buffer to bytes
-
     def _make_predict_fn(self):
         """Return PredictBatchFunction using a closure over the model"""
 
@@ -187,7 +175,7 @@ class WrappedMasking(
             )
 
             return {
-                **{f"{k}_mask": self.mask_to_bytes(v) for k, v in class_masks.items()},
+                **{f"{k}_mask": serialize_mask(v) for k, v in class_masks.items()},
             }
 
         return predict
