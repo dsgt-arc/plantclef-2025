@@ -3,7 +3,9 @@ import textwrap
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from PIL import Image
+from pyspark.sql import functions as F
 from .serde import deserialize_image, deserialize_mask
 
 
@@ -358,3 +360,70 @@ def plot_species_histogram(df, species_count: int = 100, bar_width: float = 0.8)
         ax.spines[s].set_visible(False)
     plt.tight_layout()
     plt.show()
+
+
+def plot_mask_percentage(
+    joined_df,
+    image_name: str = "CBN-Pyr-03-20230706.jpg",
+    positive_classes: list = ["leaf_mask", "flower_mask"],
+    crop_square: bool = False,
+    figsize: tuple = (15, 10),
+    fontsize: int = 16,
+    wrap_width: int = 15,
+    dpi: int = 80,
+):
+    # Create figure with GridSpec layout
+    # Top: image + table, Bottom: 2x5 masks
+    fig = plt.figure(figsize=figsize, dpi=dpi)
+    gs = fig.add_gridspec(2, 1, height_ratios=[1, 1])
+    # Top section: Image and Table
+    top_gs = gs[0].subgridspec(1, 2, width_ratios=[1, 1])
+
+    # Load the original image
+    # img_fp = BytesIO(row["data"])  # Adjust column name accordingly
+    # img = Image.open(img_fp)
+    selected_df = joined_df.where(F.col("image_name").isin(image_name))
+    mask_cols = [c for c in selected_df.columns if "mask" in c]
+    row = joined_df.first()
+    img = deserialize_image(row.data)
+
+    # Left: Display original image
+    ax_img = fig.add_subplot(top_gs[0, 0])
+    ax_img.imshow(img)
+    ax_img.axis("off")
+    wrapped_name = "\n".join(textwrap.wrap(image_name, width=wrap_width))
+    ax_img.set_title(wrapped_name, fontsize=fontsize, pad=1)
+    # ax_img.set_title(image_name)
+
+    # Right: Display tabular information
+    ax_table = fig.add_subplot(top_gs[0, 1])
+    for col in mask_cols:
+        data = {col: deserialize_mask(row[col])}
+    pdf = pd.DataFrame(data, columns=["mask", "percentage"])
+
+    # plot as a table using at most 3 decimal places
+    ax_table.axis("off")
+    ax_table.table(
+        cellText=pdf.round(3).values,
+        colLabels=pdf.columns,
+        cellLoc="left",
+        loc="center",
+    )
+
+    # Bottom section: 2x5 mask images
+    bottom_gs = gs[1].subgridspec(2, 5)
+
+    for i, (col, ax_pos) in enumerate(zip(mask_cols, bottom_gs)):
+        # fp = BytesIO(row[col])
+        # mask = np.load(fp)
+        mask = deserialize_mask(row[col])
+
+        ax = fig.add_subplot(ax_pos)
+        ax.imshow(mask, cmap="gray")
+        ax.set_title(col)
+        ax.axis("off")
+
+    # Adjust layout and display
+    plt.tight_layout()
+    plt.show()
+    # return fig
