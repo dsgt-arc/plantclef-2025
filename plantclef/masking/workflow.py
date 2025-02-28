@@ -126,7 +126,7 @@ class Workflow(luigi.WrapperTask):
         if self.sample_id is not None:
             sample_ids = [self.sample_id]
         else:
-            sample_ids = list(range(self.num_tasks))
+            sample_ids = list(range(self.num_sample_ids))
 
         tasks = []
         for sample_id in sample_ids:
@@ -148,6 +148,7 @@ def main(
     cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 8,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
+    num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 20,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
     # run the workflow
@@ -165,6 +166,7 @@ def main(
                 cpu_count=cpu_count,
                 num_sample_ids=num_sample_ids,
                 sample_id=sample_id,
+                num_partitions=num_partitions,
             )
         ],
         **kwargs,
