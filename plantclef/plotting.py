@@ -7,6 +7,28 @@ import numpy as np
 from PIL import Image
 
 
+def crop_image_square(image: Image.Image) -> np.ndarray:
+    min_dim = min(image.size)  # Get the smallest dimension
+    width, height = image.size
+    left = (width - min_dim) / 2
+    top = (height - min_dim) / 2
+    right = (width + min_dim) / 2
+    bottom = (height + min_dim) / 2
+    image = image.crop((left, top, right, bottom))
+    image_array = np.array(image)
+    return image_array
+
+
+def crop_mask_square(mask: np.ndarray) -> np.ndarray:
+    height, width = mask.shape[:2]  # Get the dimensions of the mask
+    min_dim = min(height, width)  # Get the smallest dimension
+    top = (height - min_dim) // 2
+    bottom = top + min_dim
+    left = (width - min_dim) // 2
+    right = left + min_dim
+    return mask[top:bottom, left:right]
+
+
 def plot_images_from_binary(
     df,
     data_col: str,
@@ -47,13 +69,7 @@ def plot_images_from_binary(
 
         # Crop image to square if required
         if crop_square:
-            min_dim = min(image.size)  # Get the smallest dimension
-            width, height = image.size
-            left = (width - min_dim) / 2
-            top = (height - min_dim) / 2
-            right = (width + min_dim) / 2
-            bottom = (height + min_dim) / 2
-            image = image.crop((left, top, right, bottom))
+            image = crop_image_square(image)
 
         ax.imshow(image)
         name = name.replace("_", " ")
@@ -238,6 +254,12 @@ def plot_individual_masks_comparison(
         masks = {
             mask_name: np.load(io.BytesIO(row[mask_name])) for mask_name in mask_names
         }
+
+        # crop image to square if required
+        if crop_square:
+            image_array = crop_image_square(image)
+            for name, mask in masks.items():
+                masks[name] = crop_mask_square(mask)
 
         # Expand masks to match image dimensions
         masks_rgb = {

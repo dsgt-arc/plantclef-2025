@@ -7,14 +7,14 @@
 #SBATCH -C RTX6000                              # GPU type
 #SBATCH --cpus-per-task=6                       # Number of cores per task
 #SBATCH --mem-per-gpu=64G                       # Memory per core
-#SBATCH --time=6:00:00                          # Duration of the job (6 hours)
+#SBATCH --time=8:00:00                          # Duration of the job (8 hours)
 #SBATCH --qos=embers                            # QOS Name
 #SBATCH --output=Report-%j.log                  # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
 
 # for parallel runs, break into 5 jobs 5 at a time e.g.
-#SBATCH --array=0-4%5
+#SBATCH --array=0-9%10
 
 set -xe
 # export NO_REINSTALL=1
@@ -26,7 +26,8 @@ echo "Number of CPUs: $(nproc)"
 echo "Available memory: $(free -h)"
 
 # activate the environment
-source ~/clef/plantclef-2025/scripts/activate.sh
+# source ~/clef/plantclef-2025/scripts/activate.sh
+source ~/scratch/plantclef/venv/bin/activate
 
 # check GPU availability
 python -c "import torch; print(torch.cuda.is_available())"  # Check if PyTorch can access the GPU
