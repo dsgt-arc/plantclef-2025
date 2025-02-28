@@ -52,13 +52,17 @@ def parse(input: str):
     spark = SparkSession.builder.appName("nvidia-logs").getOrCreate()
     spark.conf.set("spark.sql.legacy.timeParserPolicy", "LEGACY")
 
-    df = spark.read.json(input)
-    sub = df.select(
-        F.unix_timestamp("nvidia_smi_log.timestamp", "EEE MMM dd HH:mm:ss yyyy").alias("timestamp"),
-        "nvidia_smi_log.gpu.product_name",
-        "nvidia_smi_log.gpu.utilization",
-        "nvidia_smi_log.gpu.processes.process_info",
-    ).orderBy(F.desc("timestamp"))
+    try:
+        df = spark.read.json(input)
+        sub = df.select(
+            F.unix_timestamp("nvidia_smi_log.timestamp", "EEE MMM dd HH:mm:ss yyyy").alias("timestamp"),
+            "nvidia_smi_log.gpu.product_name",
+            "nvidia_smi_log.gpu.utilization",
+            "nvidia_smi_log.gpu.processes.process_info",
+        ).orderBy(F.desc("timestamp"))
+    except:
+        print("Error reading JSON file. Please ensure the file is in the correct format.", flush=True)
+        return
 
     gpu_name = sub.first().product_name
 

@@ -28,12 +28,12 @@ cmd = [
     f"--account={args.account}",
     "--nodes=1",
     "--ntasks=1",
-    "--cpus-per-task=4",
-    "--time=1:00:00",
+    "--cpus-per-task=8",
+    "--time=2:00:00",
     "--qos=inferno",
 ]
 if args.gpu:
-    cmd += ["--gres=gpu:v100:1"]
+    cmd += ["--gres=gpu:1", "-C=RTX6000"]
 cmd += ["--mem-per-gpu=32G" if args.gpu else "--mem-per-cpu=4G"]
 cmd = " ".join(cmd)
 print(cmd)

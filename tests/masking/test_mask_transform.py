@@ -1,7 +1,6 @@
-import io
 import numpy as np
-from PIL import Image
 from plantclef.masking.transform import WrappedMasking
+from plantclef.serde import deserialize_mask, deserialize_image
 
 
 def test_wrapped_mask_detect(test_image):
@@ -65,8 +64,8 @@ def test_wrapped_mask(spark_df):
     assert isinstance(row.masks["leaf_mask"], bytearray)
 
     # decode the bytes back into a NumPy array
-    mask = np.load(io.BytesIO(row.masks["leaf_mask"]))
-    rock_mask = np.load(io.BytesIO(row.masks["rock_mask"]))
+    mask = deserialize_mask(row.masks["leaf_mask"])
+    rock_mask = deserialize_mask(row.masks["rock_mask"])
 
     # ensure the mask is a NumPy array
     assert isinstance(mask, np.ndarray)
@@ -76,7 +75,7 @@ def test_wrapped_mask(spark_df):
 
     # ensure mask has the expected dimensions (same as input image)
     img_data = spark_df.select("data").first().data
-    img = Image.open(io.BytesIO(img_data))
+    img = deserialize_image(img_data)
     expected_shape = img.size[::-1]
     assert mask.shape == expected_shape
 
