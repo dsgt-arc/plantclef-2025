@@ -36,12 +36,12 @@ fi
 # Define paths
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
-dataset_name=test_2024
+dataset_name=test_2024_subset20
 
 # Run the Python script
 plantclef masking workflow \
     $project_data_dir/parquet/$dataset_name \
-    $project_data_dir/masking/${dataset_name}_gpu_v1 \
+    $project_data_dir/masking/${dataset_name}_v2 \
     --cpu-count 1 \
     --batch-size 1 \
     --num-sample-ids 1 \
