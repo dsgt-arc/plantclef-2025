@@ -41,7 +41,7 @@ def test_process_embeddings(spark, temp_parquet, tmp_path):
         sample_col="species_id",
         num_partitions=1,
         sample_id=0,
-        num_sample_id=1,
+        num_sample_ids=1,
         cpu_count=4,
         sql_statement="SELECT image_name, species_id, cls_embedding FROM __THIS__",
     )

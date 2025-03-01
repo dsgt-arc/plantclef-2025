@@ -16,7 +16,6 @@ def transformed_df(spark_df):
         model_path=setup_fine_tuned_model(),
         model_name="vit_base_patch14_reg4_dinov2.lvd142m",
         batch_size=2,
-        use_grid=True,
         grid_size=3,
     )
     transformed = model.transform(spark_df).cache()
@@ -44,7 +43,7 @@ def test_process_embeddings(spark, grid_size, expected_dim, temp_parquet, tmp_pa
         sample_col="image_name",
         num_partitions=1,
         sample_id=0,
-        num_sample_id=1,
+        num_sample_ids=1,
         cpu_count=4,
         grid_size=grid_size,
         sql_statement="SELECT image_name, tile, cls_embedding FROM __THIS__",

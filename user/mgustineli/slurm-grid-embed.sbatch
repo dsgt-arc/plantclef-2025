@@ -2,9 +2,9 @@
 #SBATCH --job-name=plantclef-embed              # Job name
 #SBATCH --account=paceship-dsgt_clef2025        # charge account
 #SBATCH --nodes=1                               # Number of nodes
-##SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
-#SBATCH --gres=gpu:1                            # GPU resource
-#SBATCH -C RTX6000                              # GPU type
+#SBATCH --gres=gpu:V100:1                       # Number of GPUs per node
+##SBATCH --gres=gpu:1                            # GPU resource
+##SBATCH -C RTX6000                              # GPU type
 #SBATCH --cpus-per-task=6                       # Number of cores per task
 #SBATCH --mem-per-gpu=64G                       # Memory per core
 #SBATCH --time=120                              # Duration of the job (1h20min)
