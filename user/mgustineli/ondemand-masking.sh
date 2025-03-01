@@ -29,9 +29,9 @@ else
 fi
 
 # Set environment variables
-# export PYSPARK_DRIVER_MEMORY=10g
-# export PYSPARK_EXECUTOR_MEMORY=10g
-# export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
+export PYSPARK_DRIVER_MEMORY=10g
+export PYSPARK_EXECUTOR_MEMORY=10g
+export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # Define paths
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
@@ -43,7 +43,6 @@ plantclef masking workflow \
     $project_data_dir/parquet/$dataset_name \
     $project_data_dir/masking/${dataset_name}_v2 \
     --cpu-count 1 \
-    --batch-size 1 \
     --num-sample-ids 1 \
     --sample-id 0
 
