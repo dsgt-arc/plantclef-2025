@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import requests
 
 
 def get_model_dir() -> str:
@@ -21,6 +22,7 @@ def get_scratch_model_dir() -> str:
 def setup_fine_tuned_model(
     scratch_model: bool = True,
     use_only_classifier: bool = False,
+    ensure_model_exists: bool = False,
 ):
     """
     Downloads and unzips a model from PACE and returns the path to the specified model file.
@@ -43,14 +45,24 @@ def setup_fine_tuned_model(
     full_model_path = os.path.join(model_base_path, relative_model_path)
 
     # Check if the model file exists
-    if not os.path.exists(full_model_path):
+    if not os.path.exists(full_model_path) and ensure_model_exists:
         raise FileNotFoundError(f"Model file not found at: {full_model_path}")
 
     # Return the path to the model file
     return full_model_path
 
 
+def download_file(url, dest_path):
+    response = requests.get(url, stream=True)
+    response.raise_for_status()  # Ensure the download was successful
+    with open(dest_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:  # filter out keep-alive new chunks
+                f.write(chunk)
+    print(f"Downloaded {url} to {dest_path}")
+
+
 if __name__ == "__main__":
     # Get model
-    model_path = setup_fine_tuned_model()
-    print("Model path:", model_path)
+    dino_model_path = setup_fine_tuned_model()
+    print("Model path:", dino_model_path)

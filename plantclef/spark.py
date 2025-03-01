@@ -16,6 +16,7 @@ def get_spark(
     executor_memory=os.environ.get("PYSPARK_EXECUTOR_MEMORY", "1g"),
     local_dir=os.environ.get("SPARK_LOCAL_DIR", "/tmp"),
     app_name="clef",
+    log_level="ERROR",
     **kwargs,
 ):
     """Get a spark session for a single driver."""
@@ -31,7 +32,9 @@ def get_spark(
     )
     for k, v in kwargs.items():
         builder = builder.config(k, v)
-    return builder.appName(app_name).master(f"local[{cores}]").getOrCreate()
+    spark = builder.appName(app_name).master(f"local[{cores}]").getOrCreate()
+    spark.sparkContext.setLogLevel(log_level)
+    return spark
 
 
 @contextmanager

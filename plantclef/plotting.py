@@ -1,19 +1,53 @@
-import io
 import math
+import textwrap
 
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
+from .serde import deserialize_image, deserialize_mask
 
 
-def plot_images_from_binary(df, data_col: str, image_col: str, grid_size=(3, 3)):
+def crop_image_square(image: Image.Image) -> np.ndarray:
+    min_dim = min(image.size)  # Get the smallest dimension
+    width, height = image.size
+    left = (width - min_dim) / 2
+    top = (height - min_dim) / 2
+    right = (width + min_dim) / 2
+    bottom = (height + min_dim) / 2
+    image = image.crop((left, top, right, bottom))
+    image_array = np.array(image)
+    return image_array
+
+
+def crop_mask_square(mask: np.ndarray) -> np.ndarray:
+    height, width = mask.shape[:2]  # Get the dimensions of the mask
+    min_dim = min(height, width)  # Get the smallest dimension
+    top = (height - min_dim) // 2
+    bottom = top + min_dim
+    left = (width - min_dim) // 2
+    right = left + min_dim
+    return mask[top:bottom, left:right]
+
+
+def plot_images_from_binary(
+    df,
+    data_col: str,
+    label_col: str,
+    grid_size=(3, 3),
+    crop_square: bool = False,
+    figsize: tuple = (12, 12),
+    dpi: int = 80,
+):
     """
     Display images in a grid with binomial names as labels.
 
     :param df: DataFrame with the embeddings data.
     :param data_col: Name of the data column.
-    :param image_col: Name of the species being displayed as image labels.
+    :param label_col: Name of the species being displayed as image labels.
     :param grid_size: Tuple (rows, cols) representing the grid size.
+    :param crop_square: Boolean, whether to crop images to a square format by taking the center.
+    :param figsize: Regulates the size of the figure.
+    :param dpi: Dots Per Inch, determines the resolution of the output image.
     """
     # Unpack the number of rows and columns for the grid
     rows, cols = grid_size
@@ -21,35 +55,52 @@ def plot_images_from_binary(df, data_col: str, image_col: str, grid_size=(3, 3))
     # Collect binary image data from DataFrame
     subset_df = df.limit(rows * cols).collect()
     image_data_list = [row[data_col] for row in subset_df]
-    image_names = [row[image_col] for row in subset_df]
+    image_names = [row[label_col] for row in subset_df]
 
     # Create a matplotlib subplot with the specified grid size
-    fig, axes = plt.subplots(rows, cols, figsize=(12, 12), dpi=80)
+    fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=dpi)
 
     # Flatten the axes array for easy iteration if it's 2D
     axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
 
     for ax, binary_data, name in zip(axes, image_data_list, image_names):
         # Convert binary data to an image and display it
-        image = Image.open(io.BytesIO(binary_data))
+        image = deserialize_image(binary_data)
+
+        # Crop image to square if required
+        if crop_square:
+            image = crop_image_square(image)
+
         ax.imshow(image)
         name = name.replace("_", " ")
-        ax.set_xlabel(name)  # Set the binomial name as xlabel
-        ax.xaxis.label.set_size(14)  # Set the font size for the xlabel
+        wrapped_name = "\n".join(textwrap.wrap(name, width=25))
+        ax.set_title(wrapped_name, fontsize=16, pad=1)
         ax.set_xticks([])
         ax.set_yticks([])
+        spines = ["top", "right", "bottom", "left"]
+        for s in spines:
+            ax.spines[s].set_visible(False)
     plt.tight_layout()
     plt.show()
 
 
-def plot_images_from_embeddings(df, data_col: str, image_col: str, grid_size=(3, 3)):
+def plot_images_from_embeddings(
+    df,
+    data_col: str,
+    label_col: str,
+    grid_size: tuple = (3, 3),
+    figsize: tuple = (12, 12),
+    dpi: int = 80,
+):
     """
     Display images in a grid with species names as labels.
 
     :param df: DataFrame with the embeddings data.
     :param data_col: Name of the data column.
-    :param image_col: Name of the species being displayed as image labels.
+    :param label_col: Name of the species being displayed as image labels.
     :param grid_size: Tuple (rows, cols) representing the grid size.
+    :param figsize: Regulates the size of the figure.
+    :param dpi: Dots Per Inch, determines the resolution of the output image.
     """
     # Unpack the number of rows and columns for the grid
     rows, cols = grid_size
@@ -57,10 +108,10 @@ def plot_images_from_embeddings(df, data_col: str, image_col: str, grid_size=(3,
     # Collect binary image data from DataFrame
     subset_df = df.limit(rows * cols).collect()
     embedding_data_list = [row[data_col] for row in subset_df]
-    image_names = [row[image_col] for row in subset_df]
+    image_names = [row[label_col] for row in subset_df]
 
     # Create a matplotlib subplot with specified grid size
-    fig, axes = plt.subplots(rows, cols, figsize=(12, 12), dpi=80)
+    fig, axes = plt.subplots(rows, cols, figsize=(12, 12), dpi=dpi)
 
     # Flatten the axes array for easy iteration
     axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
@@ -93,6 +144,170 @@ def plot_images_from_embeddings(df, data_col: str, image_col: str, grid_size=(3,
         ax.xaxis.label.set_size(14)
         ax.set_xticks([])
         ax.set_yticks([])
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_masks_from_binary(
+    joined_df,
+    image_data_col: str,
+    mask_data_col: str,
+    label_col: str,
+    grid_size=(3, 3),
+    crop_square: bool = False,
+    figsize: tuple = (12, 12),
+    dpi: int = 80,
+):
+    """
+    Display masks in a grid with image names as labels.
+
+    :param joined_df: DataFrame with the original and masked data.
+    :param data_col: Name of the original image data column.
+    :param mask_data_col: Name of the masked data column.
+    :param label_col: Name of the species being displayed as image labels.
+    :param grid_size: Tuple (rows, cols) representing the grid size.
+    :param crop_square: Boolean, whether to crop images to a square format by taking the center.
+    :param figsize: Regulates the size of the figure.
+    :param dpi: Dots Per Inch, determines the resolution of the output image.
+    """
+    # Unpack the number of rows and columns for the grid
+    rows, cols = grid_size
+
+    # Collect binary image data from mask DataFrame
+    subset_df = joined_df.limit(rows * cols).collect()
+    image_data = [row[image_data_col] for row in subset_df]
+    mask_image_data = [row[mask_data_col] for row in subset_df]
+    image_names = [row[label_col] for row in subset_df]
+
+    # Create a matplotlib subplot with the specified grid size
+    fig, axes = plt.subplots(rows, cols, figsize=figsize, dpi=dpi)
+
+    # Flatten the axes array for easy iteration if it's 2D
+    axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
+
+    for ax, binary_data, mask_binary_data, name in zip(
+        axes, image_data, mask_image_data, image_names
+    ):
+        # Convert binary data to an image
+        image = deserialize_image(binary_data)
+        image_array = np.array(image)
+        mask_array = deserialize_mask(mask_binary_data)
+        mask_array = np.expand_dims(mask_array, axis=-1)
+        mask_array = np.repeat(mask_array, 3, axis=-1)
+        mask_img = image_array * mask_array
+
+        # Plot the mask
+        ax.imshow(mask_img.astype(np.uint8))
+        name = name.replace("_", " ")
+        wrapped_name = "\n".join(textwrap.wrap(name, width=25))
+        ax.set_title(wrapped_name, fontsize=16, pad=1)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        spines = ["top", "right", "bottom", "left"]
+        for s in spines:
+            ax.spines[s].set_visible(False)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_individual_masks_comparison(
+    joined_df,
+    mask_names: list = ["leaf_mask", "flower_mask", "rock_mask"],
+    positive_classes: list = ["leaf_mask", "flower_mask"],
+    label_col: str = "image_name",
+    num_rows: int = 3,
+    crop_square: bool = False,
+    figsize: tuple = (15, 10),
+    fontsize: int = 16,
+    wrap_width: int = 15,
+    dpi: int = 80,
+):
+    """
+    Display masks in a grid with image names as labels.
+
+    :param joined_df: DataFrame with the original and masked data.
+    :param mask_names: List of mask names to plot individually.
+    :param label_col: Name of the species being displayed as image labels.
+    :param grid_size: Tuple (rows, cols) representing the grid size.
+    :param crop_square: Boolean, whether to crop images to a square format by taking the center.
+    :param figsize: Regulates the size of the figure.
+    :param dpi: Dots Per Inch, determines the resolution of the output image.
+    """
+    # unpack the number of rows and columns for the grid
+    cols = len(mask_names) + 2
+
+    # collect binary image data from DataFrame
+    subset_df = joined_df.limit(num_rows).collect()
+
+    # create subplots for image and masks
+    fig, axes = plt.subplots(num_rows, cols, figsize=figsize, dpi=dpi)
+
+    # ensure axes is always 2D for consistent iteration
+    axes = axes.reshape(num_rows, cols)
+
+    for row_idx, row in enumerate(subset_df):
+        # load original image
+        image = deserialize_image(row["data"]).convert("RGB")
+        image_array = np.array(image)
+
+        # Load masks
+        masks = {mask_name: np.load((row[mask_name])) for mask_name in mask_names}
+
+        # crop image to square if required
+        if crop_square:
+            image_array = crop_image_square(image)
+            for name, mask in masks.items():
+                masks[name] = crop_mask_square(mask)
+
+        # Expand masks to match image dimensions
+        masks_rgb = {
+            name: np.repeat(np.expand_dims(mask, axis=-1), 3, axis=-1)
+            for name, mask in masks.items()
+        }  # (H, W, 3)
+
+        # plot original image
+        axes[row_idx, 0].imshow(image_array)
+        wrapped_name = "\n".join(textwrap.wrap(row[label_col], width=wrap_width))
+        axes[row_idx, 0].set_title(wrapped_name, fontsize=fontsize, pad=1)
+
+        # initialize combined mask
+        combined_mask = np.zeros_like(next(iter(masks.values())))
+
+        # plot each mask
+        for col_idx, mask_name in enumerate(mask_names, start=1):
+            mask = masks_rgb[mask_name]
+
+            # Overlay mask onto the original image
+            masked_image = image_array * mask
+            axes[row_idx, col_idx].imshow(masked_image.astype(np.uint8))
+
+            name = mask_name.replace("_", " ").title()
+            wrap_mask_name = "\n".join(textwrap.wrap(name, width=wrap_width))
+            axes[row_idx, col_idx].set_title(wrap_mask_name, fontsize=fontsize, pad=1)
+
+            # Combine masks if they are in positive_classes
+            if mask_name in positive_classes:
+                combined_mask |= masks[mask_name]  # Use bitwise OR to merge
+
+        # plot combined positive masks
+        combined_mask_rgb = np.clip(combined_mask, 0, 1)  # mask is binary
+        combined_mask_rgb = np.repeat(
+            np.expand_dims(combined_mask, axis=-1), 3, axis=-1
+        )  # (H, W, 3)
+        combined_overlay = (image_array * combined_mask_rgb).astype(np.uint8)
+
+        axes[row_idx, -1].imshow(combined_overlay)
+        wrap_mask_name = "\n".join(
+            textwrap.wrap("Combined Positive Masks", width=wrap_width)
+        )
+        axes[row_idx, -1].set_title(wrap_mask_name, fontsize=fontsize, pad=1)
+
+        # remove ticks and spines
+        for ax in axes[row_idx, :]:
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for s in ["top", "right", "bottom", "left"]:
+                ax.spines[s].set_visible(False)
     plt.tight_layout()
     plt.show()
 

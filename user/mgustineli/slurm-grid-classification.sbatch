@@ -56,8 +56,8 @@ plantclef classification workflow \
     $submission_dir \
     --cpu-count 6 \
     --batch-size 1 \
-    --grid-size 6 \
-    --top-k-proba 9 \
+    --grid-size 2 \
+    --top-k-proba 5 \
     --num-sample-ids 1 \
     --sample-id 0 \
 
