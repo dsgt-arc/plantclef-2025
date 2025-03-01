@@ -35,7 +35,10 @@ uv venv venv
 source venv/bin/activate
 
 # Install dependencies unless NO_REINSTALL is set
-if [[ -z ${NO_REINSTALL:-}  ]]; then uv pip install -e "$PROJECT_ROOT"; fi
+if [[ -z ${NO_REINSTALL:-}  ]]; then
+    uv pip install -r "$PROJECT_ROOT/requirements.txt"
+    uv pip install -e "$PROJECT_ROOT";
+fi
 
 # Verify the environment setup
 echo "Python Path: $(which python)"
