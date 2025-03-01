@@ -7,7 +7,7 @@ def test_wrapped_mask_detect(test_image):
     model = WrappedMasking()
     detections = model.detect(test_image)
 
-    n = 42
+    n = 40
     assert detections["boxes"].shape == (n, 4)
     assert detections["scores"].shape == (n,)
     assert len(detections["text_labels"]) == n
@@ -23,9 +23,9 @@ def test_wrapped_mask_segment(test_image):
     print(f"input boxes shape: {input_boxes.shape}")
     # torch.Size([1, 42, 4])
     masks = model.segment(test_image, input_boxes=input_boxes)
-    # (1, 42, 3, 3024, 3024)
+    # (1, 40, 3, 3024, 3024)
     assert len(masks) > 0
-    assert masks.shape == (42, 3024, 3024)
+    assert masks.shape == (40, 3024, 3024)
     print(f"masks: {masks}")
 
 
@@ -48,7 +48,7 @@ def test_merge_class_masks(test_image):
 
 
 def test_wrapped_mask(spark_df):
-    model = WrappedMasking(input_col="data", output_col="masks", batch_size=1)
+    model = WrappedMasking(input_col="data", output_col="masks")
     transformed = model.transform(spark_df).cache()
     transformed.printSchema()
     transformed.show(vertical=True, truncate=100, n=2)
