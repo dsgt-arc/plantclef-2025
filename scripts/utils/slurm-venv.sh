@@ -24,7 +24,7 @@ pushd "$VENV_PARENT_ROOT" > /dev/null
 # Create and activate the virtual environment
 echo "Creating virtual environment in ${VENV_PARENT_ROOT}/venv ..."
 if ! command -v uv &> /dev/null; then
-    python -m ensurepip
+    python -m ensurepip --default-pip
     pip install --upgrade pip uv
 fi
 
