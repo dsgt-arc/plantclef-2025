@@ -51,7 +51,7 @@ def apply_mask_stats(
     def _generate_mask_stats(mask: bytearray):
         mask = deserialize_mask(mask)
         return generate_mask_stats(
-            mask, range(iterations_step, iterations_max, iterations_step + 1)
+            mask, range(iterations_step, iterations_max + 1, iterations_step)
         )
 
     return df.select(
