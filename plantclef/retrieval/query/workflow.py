@@ -2,16 +2,11 @@ import luigi
 import typer
 import numpy as np
 import faiss
-from pathlib import Path
 from typing_extensions import Annotated
 
-from pyspark.ml import Pipeline
-from pyspark.sql.window import Window
-from pyspark.sql.functions import lit, row_number
 from pyspark.sql.types import ArrayType, FloatType, IntegerType
 
 from plantclef.retrieval.query.index_setup import setup_index
-from plantclef.retrieval.query.transform import FaissNearestNeighbors
 from plantclef.spark import spark_resource
 
 
@@ -22,7 +17,6 @@ class FindNearestNeighbors(luigi.Task):
     output_path = luigi.Parameter()
     index_path = luigi.Parameter(default=None)
     index_name = luigi.Parameter(default="embeddings")
-    # id_map_path = luigi.Parameter(default=str(Path.home() / "scratch/plantclef/data/faiss/train"))
     k = luigi.IntParameter(default=10)
     cpu_count = luigi.IntParameter(default=4)
     num_partitions = luigi.OptionalIntParameter(default=20)
@@ -31,25 +25,10 @@ class FindNearestNeighbors(luigi.Task):
         return luigi.LocalTarget(
             f"{self.output_path}/_SUCCESS"
         )
-        
-    def pipeline(self):
-        return Pipeline(
-            stages=[
-                FaissNearestNeighbors(
-                    input_col="cls_embedding",
-                    index_path=self.index_path,
-                    index_name=self.index_name,
-                    k=self.k
-                ),
-            ]
-        )
     
     def run(self):
         
         with spark_resource(cores=self.cpu_count) as spark:
-            # df = spark.read.parquet(str(self.input_path))
-            # pipeline_model = self.pipeline().fit(df)
-            # transformed = pipeline_model.transform(df)
             
             if self.index_path is None:
                 self.index_path = setup_index(scratch_model=True, index_name=self.index_name)
@@ -76,16 +55,6 @@ class FindNearestNeighbors(luigi.Task):
 
             out_rdd = emb_df.rdd.mapPartitions(process_partition)
             out_df = spark.createDataFrame(out_rdd, schema=new_schema)
-            
-            # emb_pd = emb_df.toPandas()
-            # embeddings = np.stack(emb_pd["cls_embedding"].values).astype("float32")
-            # faiss.normalize_L2(embeddings)
-            # distances, ids = index.search(embeddings, self.k)
-            
-            # emb_pd["distances"] = [d.tolist() for d in distances]
-            # emb_pd["nn_ids"] = [i.tolist() for i in ids]
-            
-            # out_df = spark.createDataFrame(emb_pd)
             
             out_df.printSchema()
             out_df.explain()

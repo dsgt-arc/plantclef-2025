@@ -29,7 +29,7 @@ def spark_df(spark):
         ("vit_base_patch14_reg4_dinov2.lvd142m", 768),  # Adjust output dim if needed
     ],
 )
-def test_wrapped_finetuned_dinov2(spark_df, model_name, expected_dim):
+def test_embedder_finetuned_dinov2(spark_df, model_name, expected_dim):
     model = EmbedderFineTunedDINOv2(
         input_col="img",
         output_col="transformed",

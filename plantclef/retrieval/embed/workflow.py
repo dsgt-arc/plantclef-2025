@@ -119,11 +119,6 @@ class Workflow(luigi.Task):
     num_partitions = luigi.IntParameter(default=10)
 
     def requires(self):
-        # either we run a single task or we run all the tasks
-        # if self.sample_id is not None:
-        #     sample_ids = [self.sample_id]
-        # else:
-        #     sample_ids = list(range(self.num_tasks))
 
         if self.use_grid:
             file_name = f"grid={self.grid_size}x{self.grid_size}"
@@ -141,25 +136,6 @@ class Workflow(luigi.Task):
             num_partitions=self.num_partitions,
         )
         yield task
-            
-        # tasks = []
-        # for sample_id in sample_ids:
-            # task = ProcessEmbeddings(
-            #     input_path=self.input_path,
-            #     output_path=output_path,
-            #     cpu_count=self.cpu_count,
-            #     batch_size=self.batch_size,
-            #     sample_id=sample_id,
-            #     num_sample_ids=self.num_sample_ids,
-            #     use_grid=self.use_grid,
-            #     grid_size=self.grid_size,
-            #     num_partitions=self.num_partitions,
-            # )
-            # tasks.append(task)
-
-        # run ProcessInference tasks before the Submission task
-        # for task in tasks:
-        #     yield task
 
 
 def main(
