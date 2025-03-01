@@ -371,15 +371,15 @@ def plot_mask_percentage(
     col_defs = [
         ColumnDefinition(
             name="Mask",
-            textprops={"fontsize": 16, "ha": "left", "weight": "bold"},
+            textprops={"fontsize": 16, "ha": "left"},
             width=1,
             title="Mask",
         ),
         ColumnDefinition(
             name="Percentage",
-            textprops={"fontsize": 16, "ha": "left", "weight": "bold"},
+            textprops={"fontsize": 16, "ha": "left"},
             width=1,
-            title="Percentage",
+            title="Mask Percentage",
         ),
     ]
     # Use plottable to create a modern table

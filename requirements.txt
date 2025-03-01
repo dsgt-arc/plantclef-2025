@@ -12,6 +12,7 @@ timm
 transformers
 typer
 opencv-python
+plottable
 
 # developer tools
 jupyterlab
