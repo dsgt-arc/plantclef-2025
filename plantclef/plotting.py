@@ -5,8 +5,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from PIL import Image
+from plottable import ColumnDefinition, Table
 from pyspark.sql import functions as F
 from .serde import deserialize_image, deserialize_mask
+from matplotlib.font_manager import FontProperties
+
+bold_font = FontProperties(weight="bold")
 
 
 def crop_image_square(image: Image.Image) -> np.ndarray:
@@ -316,6 +320,114 @@ def plot_individual_masks_comparison(
     plt.show()
 
 
+def plot_mask_percentage(
+    joined_df,
+    image_name: str = "CBN-Pyr-03-20230706.jpg",
+    positive_classes: list = ["leaf_mask", "flower_mask"],
+    figsize: tuple = (15, 10),
+    fontsize: int = 16,
+    dpi: int = 80,
+):
+    # Create figure with GridSpec layout
+    # Top: image + table, Bottom: 2x5 masks
+    fig = plt.figure(figsize=figsize, dpi=dpi)
+    gs = fig.add_gridspec(2, 1, height_ratios=[1, 1])
+    # Top section: Image and Table
+    top_gs = gs[0].subgridspec(1, 2, width_ratios=[1, 1])
+
+    # Load the original image
+    selected_df = joined_df.where(F.col("image_name") == image_name)
+    row = selected_df.first()
+    img = deserialize_image(row.data)
+    mask_cols = [c for c in selected_df.columns if "mask" in c]
+    # convert image to numpy array for combined masking
+    image_array = np.array(img)
+
+    # Left: Display original image
+    ax_img = fig.add_subplot(top_gs[0, 0])
+    ax_img.imshow(img)
+    ax_img.axis("off")
+    wrapped_name = "\n".join(textwrap.wrap(image_name, width=25))
+    ax_img.set_title(wrapped_name, fontsize=fontsize, pad=1)
+    # ax_img.set_title(image_name)
+
+    # Right: Display tabular information
+    ax_table = fig.add_subplot(top_gs[0, 1])
+    mask_mean = {}
+    for col in mask_cols:
+        mask = deserialize_mask(row[col])
+        mask_mean[col] = mask.mean()
+    pdf = pd.DataFrame(list(mask_mean.items()), columns=["mask", "percentage"])
+
+    # Create table data
+    pdf["mask"] = pdf["mask"].str.replace("_", " ").str.title()
+    pdf["percentage"] = pdf["percentage"].round(3)
+    pdf = pdf.set_index("mask")
+    pdf.index.name = "Mask"
+    pdf.columns = [col.title() for col in pdf.columns]
+
+    # Define the Matplotlib axis
+    ax_table.axis("off")
+    col_defs = [
+        ColumnDefinition(
+            name="Mask",
+            textprops={"fontsize": 16, "ha": "left", "weight": "bold"},
+            width=1,
+            title="Mask",
+        ),
+        ColumnDefinition(
+            name="Percentage",
+            textprops={"fontsize": 16, "ha": "left", "weight": "bold"},
+            width=1,
+            title="Percentage",
+        ),
+    ]
+    # Use plottable to create a modern table
+    Table(
+        pdf,
+        column_definitions=col_defs,
+        row_dividers=True,
+        footer_divider=True,
+        textprops={"fontsize": 14, "ha": "left"},
+        row_divider_kw={"linewidth": 1, "linestyle": (0, (1, 5))},
+        col_label_divider_kw={"linewidth": 1, "linestyle": "-"},
+        column_border_kw={"linewidth": 1, "linestyle": "-"},
+    )
+
+    # Bottom section: 2x5 mask images
+    bottom_gs = gs[1].subgridspec(2, 5)
+
+    # Load masks
+    masks = {mask_name: deserialize_mask(row[mask_name]) for mask_name in mask_cols}
+    combined_mask = np.zeros_like(next(iter(masks.values())))
+    masks["combined_mask"] = combined_mask
+    # plot each mask
+    for i, ((mask_name, mask), ax_pos) in enumerate(zip(masks.items(), bottom_gs)):
+        ax = fig.add_subplot(ax_pos)
+        col_name = mask_name.replace("_", " ").title()
+        # combine masks if they are in positive_classes
+        if mask_name in positive_classes:
+            masks["combined_mask"] |= masks[mask_name]  # Use bitwise OR to merge
+
+        # plot combined positive masks
+        if i == len(masks) - 1:
+            combined_mask_rgb = np.clip(combined_mask, 0, 1)  # mask is binary
+            combined_mask_rgb = np.repeat(
+                np.expand_dims(combined_mask, axis=-1), 3, axis=-1
+            )  # (H, W, 3)
+            mask = (image_array * combined_mask_rgb).astype(np.uint8)
+            col_name = "Combined Positive Masks"
+
+        ax.imshow(mask, cmap="gray")
+        wrapped_name = "\n".join(textwrap.wrap(col_name, width=14))
+        ax.set_title(wrapped_name, fontsize=fontsize, pad=1)
+        ax.axis("off")
+
+    # Adjust layout and display
+    plt.tight_layout()
+    plt.show()
+
+
 def plot_species_histogram(df, species_count: int = 100, bar_width: float = 0.8):
     # Plotting
     fig, ax = plt.subplots(figsize=(10, 6), dpi=200)
@@ -360,75 +472,5 @@ def plot_species_histogram(df, species_count: int = 100, bar_width: float = 0.8)
     spines = ["top", "right", "bottom", "left"]
     for s in spines:
         ax.spines[s].set_visible(False)
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_mask_percentage(
-    joined_df,
-    image_name: str = "CBN-Pyr-03-20230706.jpg",
-    figsize: tuple = (15, 10),
-    fontsize: int = 16,
-    wrap_width: int = 15,
-    dpi: int = 80,
-):
-    # Create figure with GridSpec layout
-    # Top: image + table, Bottom: 2x5 masks
-    fig = plt.figure(figsize=figsize, dpi=dpi)
-    gs = fig.add_gridspec(2, 1, height_ratios=[1, 1])
-    # Top section: Image and Table
-    top_gs = gs[0].subgridspec(1, 2, width_ratios=[1, 1])
-
-    # Load the original image
-    # img_fp = BytesIO(row["data"])  # Adjust column name accordingly
-    # img = Image.open(img_fp)
-    selected_df = joined_df.where(F.col("image_name") == image_name)
-    row = selected_df.first()
-    img = deserialize_image(row.data)
-    mask_cols = [c for c in selected_df.columns if "mask" in c]
-
-    # Left: Display original image
-    ax_img = fig.add_subplot(top_gs[0, 0])
-    ax_img.imshow(img)
-    ax_img.axis("off")
-    wrapped_name = "\n".join(textwrap.wrap(image_name, width=wrap_width))
-    ax_img.set_title(wrapped_name, fontsize=fontsize, pad=1)
-    # ax_img.set_title(image_name)
-
-    # Right: Display tabular information
-    ax_table = fig.add_subplot(top_gs[0, 1])
-    data = {}
-    for col in mask_cols:
-        mask = deserialize_mask(row[col])
-        data[col] = mask.mean()
-    pdf = pd.DataFrame(list(data.items()), columns=["mask", "percentage"])
-
-    # plot as a table using at most 3 decimal places
-    ax_table.axis("off")
-    pdf["mask"] = pdf["mask"].str.replace("_", " ").str.title()
-    ax_table.table(
-        cellText=pdf.round(3).values,
-        colLabels=pdf.columns,
-        cellLoc="left",
-        loc="center",
-    )
-
-    # Bottom section: 2x5 mask images
-    bottom_gs = gs[1].subgridspec(2, 5)
-
-    for i, (col, ax_pos) in enumerate(zip(mask_cols, bottom_gs)):
-        # fp = BytesIO(row[col])
-        # mask = np.load(fp)
-        mask = deserialize_mask(row[col])
-
-        ax = fig.add_subplot(ax_pos)
-        ax.imshow(mask, cmap="gray")
-        col_name = col.replace("_", " ").title()
-        wrapped_name = "\n".join(textwrap.wrap(col_name, width=wrap_width))
-        ax.set_title(wrapped_name, fontsize=fontsize, pad=1)
-        ax.axis("off")
-        # ax.set_title(col)
-
-    # Adjust layout and display
     plt.tight_layout()
     plt.show()
