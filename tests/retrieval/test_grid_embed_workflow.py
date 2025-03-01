@@ -16,9 +16,10 @@ def transformed_df(spark_df):
         model_path=setup_fine_tuned_model(),
         model_name="vit_base_patch14_reg4_dinov2.lvd142m",
         batch_size=2,
-        grid_size=3,
+        grid_size=4,
     )
     transformed = model.transform(spark_df).cache()
+    transformed.printSchema()
     return transformed
 
 

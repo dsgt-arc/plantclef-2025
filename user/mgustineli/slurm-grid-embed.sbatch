@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=6                       # Number of cores per task
 #SBATCH --mem-per-gpu=64G                       # Memory per core
 #SBATCH --time=120                              # Duration of the job (1h20min)
-#SBATCH --qos=embers                            # QOS Name
+#SBATCH --qos=inferno                           # QOS Name
 #SBATCH --output=Report-%j.log                  # Combined output and error messages file
 #SBATCH --mail-type=BEGIN,END,FAIL              # Mail preferences
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
