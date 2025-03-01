@@ -30,7 +30,7 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 # define paths
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
-dataset_name=test/test_2024
+dataset_name=test_2024
 grid_size=3
 k=50
 
@@ -39,7 +39,7 @@ grid_folder="grid=${grid_size}x${grid_size}"
 
 # run Python script
 plantclef retrieval query workflow \
-    $scratch_data_dir/embeddings/$dataset_name/$grid_folder \
-    $scratch_data_dir/knn/$k_folder/$grid_folder \
+    $scratch_data_dir/embeddings/test/$dataset_name/$grid_folder \
+    $scratch_data_dir/knn/$dataset_name/$k_folder/$grid_folder \
     --k $k \
     --cpu-count 16
