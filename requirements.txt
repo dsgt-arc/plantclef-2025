@@ -13,6 +13,7 @@ transformers
 typer
 opencv-python
 plottable
+huggingface_hub
 
 # developer tools
 jupyterlab
@@ -20,3 +21,4 @@ ruff
 pre-commit
 pytest
 xmltodict
+ipywidgets
