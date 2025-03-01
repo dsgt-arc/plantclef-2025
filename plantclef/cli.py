@@ -3,7 +3,7 @@ from plantclef.embedding import app as embedding_app
 from plantclef.classification import app as classification_app
 from plantclef.preprocessing import app as preprocessing_app
 from plantclef.masking import app as masking_app
-from plantclef.morph import app as morph_app
+from plantclef.morph.workflow import app as morph_app
 
 app = Typer()
 app.add_typer(embedding_app, name="embedding")
