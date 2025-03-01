@@ -28,8 +28,7 @@ class ProcessEmbeddings(luigi.Task):
     # of tasks that we have in parallel to best take advantage of disk
     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
-    use_grid = luigi.BoolParameter(default=True)
-    grid_size = luigi.IntParameter(default=3)
+    grid_size = luigi.IntParameter(default=4)
     sql_statement = luigi.Parameter(
         default="SELECT image_name, tile, cls_embedding FROM __THIS__"
     )
@@ -49,7 +48,6 @@ class ProcessEmbeddings(luigi.Task):
                     model_path=self.model_path,
                     model_name=self.model_name,
                     batch_size=self.batch_size,
-                    use_grid=self.use_grid,
                     grid_size=self.grid_size,
                 ),
                 SQLTransformer(statement=self.sql_statement),
@@ -113,25 +111,17 @@ class Workflow(luigi.Task):
     num_sample_ids = luigi.IntParameter(default=20)
     cpu_count = luigi.IntParameter(default=6)
     batch_size = luigi.IntParameter(default=32)
-    # set use_grid=False to perform inference on the entire image
-    use_grid = luigi.BoolParameter(default=True)
-    grid_size = luigi.IntParameter(default=3)  # 3x3 grid
+    grid_size = luigi.IntParameter(default=4)  # 4x4 grid
     num_partitions = luigi.IntParameter(default=10)
 
     def requires(self):
-
-        if self.use_grid:
-            file_name = f"grid={self.grid_size}x{self.grid_size}"
-            output_path = f"{self.output_path}/{file_name}"
-            
         task = ProcessEmbeddings(
             input_path=self.input_path,
-            output_path=output_path,
+            output_path=self.output_path,
             cpu_count=self.cpu_count,
             batch_size=self.batch_size,
             sample_id=0,
             num_sample_ids=1,
-            use_grid=self.use_grid,
             grid_size=self.grid_size,
             num_partitions=self.num_partitions,
         )
@@ -145,8 +135,7 @@ def main(
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
-    use_grid: Annotated[bool, typer.Option(help="Use grid")] = True,
-    grid_size: Annotated[int, typer.Option(help="Grid size")] = 3,
+    grid_size: Annotated[int, typer.Option(help="Grid size")] = 4,
     num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 10,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
@@ -166,7 +155,6 @@ def main(
                 batch_size=batch_size,
                 num_sample_ids=num_sample_ids,
                 sample_id=sample_id,
-                use_grid=use_grid,
                 grid_size=grid_size,
                 num_partitions=num_partitions,
             )

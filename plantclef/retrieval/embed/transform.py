@@ -36,7 +36,6 @@ class EmbedderFineTunedDINOv2(
         model_path: str = setup_fine_tuned_model(),
         model_name: str = "vit_base_patch14_reg4_dinov2.lvd142m",
         batch_size: int = 8,
-        use_grid: bool = False,
         grid_size: int = 3,
     ):
         super().__init__()
@@ -63,7 +62,6 @@ class EmbedderFineTunedDINOv2(
         # Move model to GPU if available
         self.model.to(self.device)
         self.model.eval()
-        self.use_grid = use_grid
         self.grid_size = grid_size
 
     def _split_into_grid(self, image):
@@ -100,9 +98,7 @@ class EmbedderFineTunedDINOv2(
 
         def predict(input_data):
             img = Image.open(io.BytesIO(input_data))
-            images = [img]
-            if self.use_grid:
-                images = self._split_into_grid(img)
+            images = self._split_into_grid(img)
             results = []
             for tile in images:
                 processed_image = self.transforms(tile).unsqueeze(0).to(self.device)

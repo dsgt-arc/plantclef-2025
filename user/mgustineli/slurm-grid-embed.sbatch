@@ -46,16 +46,19 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 # define paths
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
-dataset_name=test_2024_subset20
+dataset_name=test_2024_subset20_v2
+grid_size=4
+file_name="${dataset_name}_grid=${grid_size}x${grid_size}"
 
-# run Python script
+# run the Python script
 plantclef retrieval embed workflow \
-    $project_data_dir/parquet/$dataset_name \
-    $project_data_dir/masking/${dataset_name}_gpu_v1 \
-    --cpu-count 1 \
+    $project_data_dir/masking/$dataset_name \
+    $project_data_dir/embeddings/$file_name \
+    --cpu-count 4 \
     --batch-size 1 \
     --num-sample-ids 1 \
-    --sample-id 0
+    --sample-id 0 \
+    --grid-size $grid_size \
 
 # parse the nvida monitoring output
 python ~/clef/plantclef-2025/scripts/nvidia-logs.sh parse Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
