@@ -31,6 +31,7 @@ class ProcessEmbeddings(luigi.Task):
     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
     grid_size = luigi.IntParameter(default=4)
+    overlay_masks = luigi.BoolParameter(default=True)
     sql_statement = luigi.Parameter(
         default="SELECT image_name, tile, leaf_embed, flower_embed, plant_embed FROM __THIS__"
     )
@@ -59,6 +60,7 @@ class ProcessEmbeddings(luigi.Task):
 
     @property
     def feature_columns(self) -> list:
+        # feature cols that will be created by the transformation
         return ["leaf_embed", "flower_embed", "plant_embed"]
 
     def transform(self, model, df, features) -> DataFrame:
@@ -76,17 +78,28 @@ class ProcessEmbeddings(luigi.Task):
             "cores": self.cpu_count,
         }
         with spark_resource(**kwargs) as spark:
-            # read the data and keep the sample we're currently processing
-            df = (
-                spark.read.parquet(self.input_path)
-                .withColumn(
-                    "sample_id",
-                    F.crc32(F.col(self.sample_col).cast("string"))
-                    % self.num_sample_ids,
+            # apply overlay masks
+            if self.overlay_masks:
+                df = ProcessMaskOverlay(
+                    input_path=self.input_path,
+                    test_data_path=self.test_data_path,
+                    sample_col=self.sample_col,
+                    sample_id=self.sample_id,
+                    cpu_count=self.cpu_count,
                 )
-                .where(F.col("sample_id") == self.sample_id)
-                .drop("sample_id")
-            )
+                yield df
+            # read the data and keep the sample we're currently processing
+            else:
+                df = (
+                    spark.read.parquet(self.input_path)
+                    .withColumn(
+                        "sample_id",
+                        F.crc32(F.col(self.sample_col).cast("string"))
+                        % self.num_sample_ids,
+                    )
+                    .where(F.col("sample_id") == self.sample_id)
+                    .drop("sample_id")
+                )
 
             # create the pipeline model
             pipeline_model = self.pipeline().fit(df)
@@ -115,16 +128,10 @@ class Workflow(luigi.Task):
     cpu_count = luigi.IntParameter(default=6)
     batch_size = luigi.IntParameter(default=32)
     grid_size = luigi.IntParameter(default=4)  # 4x4 grid
+    overlay_masks = luigi.BoolParameter(default=True)
     num_partitions = luigi.IntParameter(default=10)
 
     def requires(self):
-        # TODO: implement a task to process the masks overlay
-        overlay = ProcessMaskOverlay(
-            input_path=self.input_path,
-            output_path=self.output_path,
-        )
-        yield overlay
-
         task = ProcessEmbeddings(
             input_path=self.input_path,
             output_path=self.output_path,
@@ -134,6 +141,7 @@ class Workflow(luigi.Task):
             sample_id=0,
             num_sample_ids=1,
             grid_size=self.grid_size,
+            overlay_masks=self.overlay_masks,
             num_partitions=self.num_partitions,
         )
         yield task
@@ -148,6 +156,7 @@ def main(
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
     grid_size: Annotated[int, typer.Option(help="Grid size")] = 4,
+    overlay_masks: Annotated[bool, typer.Option(help="Overlay masks")] = True,
     num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 10,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
@@ -169,6 +178,7 @@ def main(
                 num_sample_ids=num_sample_ids,
                 sample_id=sample_id,
                 grid_size=grid_size,
+                overlay_masks=overlay_masks,
                 num_partitions=num_partitions,
             )
         ],

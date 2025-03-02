@@ -76,10 +76,6 @@ class EmbedderFineTunedDINOv2(
                 tiles.append(tile)
         return tiles
 
-    # TODO: implement mask overlay for extracting embeddings
-    def _overlay_mask_image(self):
-        pass
-
     def _nvidia_smi(self):
         from subprocess import run, PIPE
 
@@ -100,10 +96,6 @@ class EmbedderFineTunedDINOv2(
 
         def predict(input_data):
             img = Image.open(io.BytesIO(input_data))
-            # mask_array = deserialize_mask(input_data)
-            # mask_array = np.expand_dims(mask_array, axis=-1)
-            # mask_array = np.repeat(mask_array, 3, axis=-1)
-            # mask_img = image_array * mask_array
             tiles = self._split_into_grid(img)
             results = []
             for tile in tiles:
