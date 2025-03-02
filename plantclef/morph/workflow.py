@@ -5,6 +5,7 @@ from plantclef.serde import deserialize_mask
 from typing import Iterable
 import typer
 from pyspark.sql import functions as F
+from pathlib import Path
 
 app = typer.Typer()
 
@@ -65,8 +66,10 @@ def mask_stats_workflow(
     input_path: str,
     output_path: str,
     iterations_max: int = 100,
-    iterations_step: int = 5,
-    num_partitions: int = 32,
+    iterations_step: int = 10,
+    num_partitions: int = 4,
+    num_sample_ids: int = 20,
+    sample_id: int | None = None,
 ):
     """Calculate the statistics for the masks.
 
@@ -87,14 +90,30 @@ def mask_stats_workflow(
         |-- sample_id: integer (nullable = true)
     """
     df = get_spark().read.parquet(input_path)
+    if "sample_id" in df.columns:
+        df = df.drop("sample_id")
+    if sample_id is not None:
+        print(f"processing sample_id {sample_id}")
+        output_path = f"{output_path}/sample_id={sample_id}"
+        df = df.withColumn("sample_id", F.crc32("image_name") % num_sample_ids).where(
+            F.col("sample_id") == sample_id
+        )
 
+    # check if the output is already processed
+    if (Path(output_path) / "_SUCCESS").exists():
+        print(f"output already exists at {output_path}")
+        return
+
+    # repartition to at least the number of cpus
     applied_df = apply_mask_stats(
-        df,
+        # divisible by 24 and 32
+        df.repartition(96),
         [c for c in df.columns if "mask" not in c],
         [c for c in df.columns if "mask" in c],
         iterations_max,
         iterations_step,
     ).repartition(num_partitions)
 
+    print(f"writing to {output_path}")
     applied_df.printSchema()
     applied_df.write.parquet(output_path, mode="overwrite")
