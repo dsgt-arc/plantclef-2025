@@ -98,7 +98,7 @@ class EmbedderFineTunedDINOv2(
             # TODO: remove this print statement, debugging only
             print(f"[DEBUG] input type: {type(input_data)}, length: {len(input_data)}")
 
-            img = deserialize_image(input_data).convert("RGB")
+            img = deserialize_image(input_data)  # .convert("RGB")
             tiles = self._split_into_grid(np.array(img))
             results = []
             for tile in tiles:

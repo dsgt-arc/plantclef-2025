@@ -1,8 +1,13 @@
+import numpy as np
+from PIL import Image
 import pytest
 import luigi
 
 from plantclef.spark import get_spark
+from plantclef.serde import deserialize_image
 from plantclef.retrieval.embed.workflow import ProcessEmbeddings
+from pyspark.sql import functions as F
+from pyspark.sql.types import BinaryType
 
 
 @pytest.fixture
@@ -10,6 +15,37 @@ def temp_parquet(spark_df, tmp_path):
     path = tmp_path / "data"
     spark_df.write.parquet(path.as_posix())
     return path
+
+
+def test_apply_overlay(spark, test_data_path, temp_parquet, tmp_path):
+    # join the test data with the mask data
+    mask_df = spark.read.parquet(temp_parquet.as_posix())
+    test_df = spark.read.parquet(test_data_path.as_posix())
+    df = mask_df.join(test_df, on="image_name", how="inner")
+    # apply the overlay
+    overlay_udf = F.udf(ProcessEmbeddings.apply_overlay, BinaryType())
+    for mask_col in ["leaf_mask", "flower_mask", "plant_mask"]:
+        overlay_col = mask_col.replace("mask", "overlay")
+        df = df.withColumn(overlay_col, overlay_udf(F.col("data"), F.col(mask_col)))
+
+    print("Joined Dataframe:")
+    df.printSchema()
+    leaf_overlay = df.select("leaf_overlay").first().leaf_overlay
+    print(f"leaf_overlay type: {type(leaf_overlay)}")
+
+    # ensure that the output mask is a NumPy array
+    assert isinstance(leaf_overlay, bytearray)
+
+    # decode the bytes back into a NumPy array
+    mask = deserialize_image(leaf_overlay)
+    assert isinstance(mask, Image.Image)
+
+    # ensure mask has the expected dimensions (same as input image)
+    img_data = df.select("data").first().data
+    img = deserialize_image(img_data)
+    expected_shape = img.size[::-1]
+    mask = np.array(mask)
+    print(f"mask shape: {mask.shape}, img shape: {expected_shape}")
 
 
 @pytest.mark.parametrize(

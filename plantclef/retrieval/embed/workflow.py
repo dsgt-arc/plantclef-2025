@@ -83,21 +83,28 @@ class ProcessEmbeddings(luigi.Task):
         sql_statement = f"SELECT image_name, tile, {mask_cols_str} FROM __THIS__"
         return sql_statement
 
-    def apply_overlay(self, image_bytes: bytes, mask_bytes: bytes) -> bytes:
+    @staticmethod
+    def apply_overlay(image_bytes: bytes, mask_bytes: bytes) -> bytes:
         """Overlay  the mask onto the image."""
 
         image = deserialize_image(image_bytes)  # returns Image.Image
         image_array = np.array(image)
         print("image_array shape:", image_array.shape)
+        print("image type:", type(image_array))
         mask_array = deserialize_mask(mask_bytes)  # returns np.ndarray
         print("mask_array shape:", mask_array.shape)
         # convert to 3 channels -> (H, W, 3)
-        mask_array = np.repeat(np.expand_dims(mask_array, axis=-1), 3, axis=-1)
+        # mask_array = np.repeat(np.expand_dims(mask_array, axis=-1), 3, axis=-1)
+        mask_array = np.expand_dims(mask_array, axis=-1)
+        print("mask_array shape:", mask_array.shape)
         # apply overlay
         overlay_img = image_array * mask_array
+        print("overlay_img shape:", overlay_img.shape)
         # convert back to bytes
         overlay_pil = Image.fromarray(overlay_img)
+        print("overlay_pil shape:", overlay_pil.size)
         overlay_bytes = serialize_image(overlay_pil)
+        # pdb
 
         return overlay_bytes
 
