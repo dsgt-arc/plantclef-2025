@@ -61,6 +61,7 @@ class WrappedMasking(
             checkpoint_path_groundingdino
         )
         # params for groundingdino
+
         self.CLASSES = [
             "leaf",
             "flower",
@@ -68,9 +69,9 @@ class WrappedMasking(
             "sand",
             "wood",
             "tape",
-            "tree",
             "rock",
-            "vegetation",
+            "snow",
+            "gravel",
         ]
         self.BOX_THRESHOLD = 0.15
         self.TEXT_THRESHOLD = 0.1
@@ -191,9 +192,9 @@ class WrappedMasking(
                     StructField("sand_mask", BinaryType(), False),
                     StructField("wood_mask", BinaryType(), False),
                     StructField("tape_mask", BinaryType(), False),
-                    StructField("tree_mask", BinaryType(), False),
                     StructField("rock_mask", BinaryType(), False),
-                    StructField("vegetation_mask", BinaryType(), False),
+                    StructField("snow_mask", BinaryType(), False),
+                    StructField("gravel_mask", BinaryType(), False),
                 ]
             ),
         )

@@ -71,9 +71,9 @@ class ProcessMasking(luigi.Task):
             .withColumn("sand_mask", F.col("masks.sand_mask"))
             .withColumn("wood_mask", F.col("masks.wood_mask"))
             .withColumn("tape_mask", F.col("masks.tape_mask"))
-            .withColumn("tree_mask", F.col("masks.tree_mask"))
             .withColumn("rock_mask", F.col("masks.rock_mask"))
-            .withColumn("vegetation_mask", F.col("masks.vegetation_mask"))
+            .withColumn("snow_mask", F.col("masks.snow_mask"))
+            .withColumn("gravel_mask", F.col("masks.gravel_mask"))
             .drop("masks")
         )
 
