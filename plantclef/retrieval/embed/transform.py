@@ -1,14 +1,12 @@
-import io
-
 import timm
 import torch
-from PIL import Image
 from plantclef.model_setup import setup_fine_tuned_model
+from plantclef.serde import deserialize_mask
 
 from .params import HasModelName, HasModelPath, HasBatchSize
 
 from pyspark.ml import Transformer
-from pyspark.ml.param.shared import HasInputCol, HasOutputCol
+from pyspark.ml.param.shared import HasInputCols, HasOutputCols
 from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
@@ -17,8 +15,8 @@ from pyspark.sql.types import ArrayType, FloatType
 
 class EmbedderFineTunedDINOv2(
     Transformer,
-    HasInputCol,
-    HasOutputCol,
+    HasInputCols,
+    HasOutputCols,
     HasModelPath,
     HasModelName,
     HasBatchSize,
@@ -31,17 +29,17 @@ class EmbedderFineTunedDINOv2(
 
     def __init__(
         self,
-        input_col: str = "input",
-        output_col: str = "output",
+        input_cols: list = ["leaf_mask", "flower_mask", "plant_mask"],
+        output_cols: list = ["leaf_embed", "flower_embed", "plant_embed"],
         model_path: str = setup_fine_tuned_model(),
         model_name: str = "vit_base_patch14_reg4_dinov2.lvd142m",
         batch_size: int = 8,
-        grid_size: int = 3,
+        grid_size: int = 4,
     ):
         super().__init__()
         self._setDefault(
-            inputCol=input_col,
-            outputCol=output_col,
+            inputCols=input_cols,
+            outputCols=output_cols,
             modelPath=model_path,
             modelName=model_name,
             batchSize=batch_size,
@@ -64,19 +62,18 @@ class EmbedderFineTunedDINOv2(
         self.model.eval()
         self.grid_size = grid_size
 
-    def _split_into_grid(self, image):
-        w, h = image.size
-        grid_w, grid_h = w // self.grid_size, h // self.grid_size
-        images = []
+    def _split_into_grid(self, mask_array):
+        """Splits the numpy mask array into grid tiles."""
+        h, w = mask_array.shape
+        grid_h, grid_w = h // self.grid_size, w // self.grid_size
+        tiles = []
         for i in range(self.grid_size):
             for j in range(self.grid_size):
-                left = i * grid_w
-                upper = j * grid_h
-                right = left + grid_w
-                lower = upper + grid_h
-                crop_image = image.crop((left, upper, right, lower))
-                images.append(crop_image)
-        return images
+                tile = mask_array[
+                    i * grid_h : (i + 1) * grid_h, j * grid_w : (j + 1) * grid_w
+                ]
+                tiles.append(tile)
+        return tiles
 
     def _nvidia_smi(self):
         from subprocess import run, PIPE
@@ -97,11 +94,17 @@ class EmbedderFineTunedDINOv2(
         self._nvidia_smi()
 
         def predict(input_data):
-            img = Image.open(io.BytesIO(input_data))
-            images = self._split_into_grid(img)
+            # img = Image.open(io.BytesIO(input_data))
+            mask_array = deserialize_mask(input_data)
+            tiles = self._split_into_grid(mask_array)
             results = []
-            for tile in images:
-                processed_image = self.transforms(tile).unsqueeze(0).to(self.device)
+            for tile in tiles:
+                processed_image = (
+                    self.transforms(tile, dtype=torch.float32)
+                    .unsqueeze(0)
+                    .unsqueeze(0)
+                    .to(self.device)
+                )
                 with torch.no_grad():
                     features = self.model.forward_features(processed_image)
                     cls_token = features[:, 0, :].squeeze(0)
@@ -114,14 +117,24 @@ class EmbedderFineTunedDINOv2(
     def _transform(self, df: DataFrame):
         predict_fn = self._make_predict_fn()
         predict_udf = F.udf(predict_fn, ArrayType(ArrayType(FloatType())))
-        intermediate_col = "all_" + self.getOutputCol()
-        df = df.withColumn(
-            intermediate_col, predict_udf(F.col(self.getInputCol()))
-        ).drop(self.getInputCol())
-
-        # explode embeddings so that each row has a single tile embedding
-        df = df.selectExpr(
-            "*", f"posexplode({intermediate_col}) as (tile, {self.getOutputCol()})"
-        ).drop(intermediate_col)
+        # retrieve embeddings for each input column
+        tile_col = "tile"
+        for idx, (input_col, output_col) in enumerate(
+            zip(self.getInputCols(), self.getOutputCols())
+        ):
+            intermediate_col = f"all_{output_col}"
+            df = df.withColumn(intermediate_col, predict_udf(F.col(input_col))).drop(
+                input_col
+            )
+            # explode embeddings so that each row has a single tile embedding
+            if idx == 0:  # only explode the tile column once
+                df = df.selectExpr(
+                    "*", f"posexplode({intermediate_col}) as ({tile_col}, {output_col})"
+                )
+            else:
+                df = df.selectExpr(
+                    "*", f"posexplode({intermediate_col}) as (tmp_tile, {output_col})"
+                )
+                df = df.drop(intermediate_col).drop("tmp_tile")
 
         return df

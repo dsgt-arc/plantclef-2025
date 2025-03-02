@@ -3,30 +3,12 @@ import luigi
 
 from plantclef.spark import get_spark
 from plantclef.retrieval.embed.workflow import ProcessEmbeddings
-from plantclef.retrieval.embed.transform import EmbedderFineTunedDINOv2
-from plantclef.model_setup import setup_fine_tuned_model
 
 
 @pytest.fixture
-def transformed_df(spark_df):
-    # transform image and return masks
-    model = EmbedderFineTunedDINOv2(
-        input_col="data",
-        output_col="cls_embedding",
-        model_path=setup_fine_tuned_model(),
-        model_name="vit_base_patch14_reg4_dinov2.lvd142m",
-        batch_size=2,
-        grid_size=4,
-    )
-    transformed = model.transform(spark_df).cache()
-    transformed.printSchema()
-    return transformed
-
-
-@pytest.fixture
-def temp_parquet(transformed_df, tmp_path):
+def temp_parquet(spark_df, tmp_path):
     path = tmp_path / "data"
-    transformed_df.write.parquet(path.as_posix())
+    spark_df.write.parquet(path.as_posix())
     return path
 
 
@@ -36,7 +18,9 @@ def temp_parquet(transformed_df, tmp_path):
         (4, 768),
     ],
 )
-def test_process_embeddings(spark, grid_size, expected_dim, temp_parquet, tmp_path):
+def test_process_embeddings(
+    spark, grid_size, expected_dim, test_mask_path, temp_parquet, tmp_path
+):
     output = tmp_path / "output"
     task = ProcessEmbeddings(
         input_path=temp_parquet.as_posix(),
@@ -47,7 +31,7 @@ def test_process_embeddings(spark, grid_size, expected_dim, temp_parquet, tmp_pa
         num_sample_ids=1,
         cpu_count=4,
         grid_size=grid_size,
-        sql_statement="SELECT image_name, tile, cls_embedding FROM __THIS__",
+        sql_statement="SELECT image_name, tile, leaf_embed, flower_embed, plant_embed FROM __THIS__",
     )
     luigi.build([task], local_scheduler=True)
 
@@ -59,7 +43,9 @@ def test_process_embeddings(spark, grid_size, expected_dim, temp_parquet, tmp_pa
     assert transformed.columns == [
         "image_name",
         "tile",
-        "cls_embedding",
+        "leaf_embed",
+        "flower_embed",
+        "plant_embed",
         "sample_id",
     ]
     row = transformed.select("cls_embedding").first()

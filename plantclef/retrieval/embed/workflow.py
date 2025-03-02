@@ -30,7 +30,7 @@ class ProcessEmbeddings(luigi.Task):
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
     grid_size = luigi.IntParameter(default=4)
     sql_statement = luigi.Parameter(
-        default="SELECT image_name, tile, cls_embedding FROM __THIS__"
+        default="SELECT image_name, tile, leaf_embed, flower_embed, plant_embed FROM __THIS__"
     )
 
     def output(self):
@@ -43,8 +43,8 @@ class ProcessEmbeddings(luigi.Task):
         model = Pipeline(
             stages=[
                 EmbedderFineTunedDINOv2(
-                    input_col="data",
-                    output_col="cls_embedding",
+                    input_cols=["leaf_mask", "flower_mask", "plant_mask"],
+                    output_cols=["leaf_embed", "flower_embed", "plant_embed"],
                     model_path=self.model_path,
                     model_name=self.model_name,
                     batch_size=self.batch_size,
@@ -57,7 +57,7 @@ class ProcessEmbeddings(luigi.Task):
 
     @property
     def feature_columns(self) -> list:
-        return ["cls_embedding"]
+        return ["leaf_embed", "flower_embed", "plant_embed"]
 
     def transform(self, model, df, features) -> DataFrame:
         transformed = model.transform(df)
