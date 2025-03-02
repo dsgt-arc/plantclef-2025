@@ -12,6 +12,7 @@ timm
 transformers
 typer
 opencv-python
+scikit-image
 faiss-gpu
 
 # developer tools
