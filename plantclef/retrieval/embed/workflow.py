@@ -8,7 +8,8 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from plantclef.model_setup import setup_fine_tuned_model
-from plantclef.retrieval.embed.transform import EmbedderFineTunedDINOv2
+from .transform import EmbedderFineTunedDINOv2
+from .overlay import ProcessMaskOverlay
 from plantclef.spark import spark_resource
 
 
@@ -86,13 +87,9 @@ class ProcessEmbeddings(luigi.Task):
                 .where(F.col("sample_id") == self.sample_id)
                 .drop("sample_id")
             )
-            test_df = spark.read.parquet(self.test_data_path)
-            # TODO: join with test DataFrame for the original images
-            joined_df = df.join(test_df, "image_name")
-            # TODO: implement image overlay with the masks
 
             # create the pipeline model
-            pipeline_model = self.pipeline().fit(joined_df)
+            pipeline_model = self.pipeline().fit(df)
 
             # transform the dataframe and write to disk
             transformed = self.transform(pipeline_model, df, self.feature_columns)
@@ -121,6 +118,13 @@ class Workflow(luigi.Task):
     num_partitions = luigi.IntParameter(default=10)
 
     def requires(self):
+        # TODO: implement a task to process the masks overlay
+        overlay = ProcessMaskOverlay(
+            input_path=self.input_path,
+            output_path=self.output_path,
+        )
+        yield overlay
+
         task = ProcessEmbeddings(
             input_path=self.input_path,
             output_path=self.output_path,
