@@ -23,7 +23,6 @@ def test_process_embeddings(
     grid_size,
     mask_cols,
     expected_dim,
-    test_mask_path,
     test_data_path,
     temp_parquet,
     tmp_path,

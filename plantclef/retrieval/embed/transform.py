@@ -1,8 +1,6 @@
-import io
 import timm
 import torch
 import numpy as np
-from PIL import Image
 from plantclef.model_setup import setup_fine_tuned_model
 from plantclef.serde import deserialize_image
 
@@ -77,27 +75,6 @@ class EmbedderFineTunedDINOv2(
                 ]
                 tiles.append(tile)
         return tiles
-
-    def _deserialize_spark_image(self, input_data) -> np.ndarray:
-        """Decode the image from raw bytes using PIL."""
-        if not bytes:
-            print("[ERROR] Empty bytes received for deserialization")
-            return None
-
-        buffer = io.BytesIO(input_data)
-
-        # Debugging: Print the first few bytes
-        sample_bytes = bytes[:10] if bytes else b""
-        print(f"[DEBUG] First 10 bytes of input: {sample_bytes}")
-
-        try:
-            img = Image.open(buffer)
-            img.verify()  # Check if PIL can recognize it
-            buffer.seek(0)  # Reset buffer before reopening
-            return Image.open(buffer).convert("RGB")
-        except Exception as e:
-            print(f"[ERROR] Failed to open image: {e}")
-            return None  # Return None instead of crashing
 
     def _nvidia_smi(self):
         from subprocess import run, PIPE

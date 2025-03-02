@@ -86,8 +86,12 @@ class ProcessEmbeddings(luigi.Task):
     def apply_overlay(self, image_bytes: bytes, mask_bytes: bytes) -> bytes:
         """Overlay  the mask onto the image."""
 
-        image_array = deserialize_image(image_bytes)
-        mask_array = deserialize_mask(mask_bytes)
+        image = deserialize_image(image_bytes)  # returns Image.Image
+        image_array = np.array(image)
+        print("image_array shape:", image_array.shape)
+        mask_array = deserialize_mask(mask_bytes)  # returns np.ndarray
+        print("mask_array shape:", mask_array.shape)
+        # convert to 3 channels -> (H, W, 3)
         mask_array = np.repeat(np.expand_dims(mask_array, axis=-1), 3, axis=-1)
         # apply overlay
         overlay_img = image_array * mask_array
@@ -117,6 +121,22 @@ class ProcessEmbeddings(luigi.Task):
         # TODO: remove this print statement, debugging only
         print("Joined Dataframe:")
         df.printSchema()
+        leaf_overlay = df.select("leaf_overlay").first().leaf_overlay
+        print(f"leaf_overlay type: {type(leaf_overlay)}")
+
+        # ensure that the output mask is a NumPy array
+        assert isinstance(leaf_overlay, bytearray)
+
+        # decode the bytes back into a NumPy array
+        mask = deserialize_image(leaf_overlay)
+        assert isinstance(mask, Image.Image)
+
+        # ensure mask has the expected dimensions (same as input image)
+        img_data = df.select("data").first().data
+        img = deserialize_image(img_data)
+        expected_shape = img.size[::-1]
+        mask = np.array(mask)
+        print(f"mask shape: {mask.shape}, img shape: {expected_shape}")
 
         # run model pipeline
         transformed = model.transform(df)
