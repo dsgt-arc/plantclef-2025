@@ -17,6 +17,7 @@ class ProcessEmbeddings(luigi.Task):
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
+    test_data_path = luigi.Parameter()
     cpu_count = luigi.IntParameter(default=4)
     batch_size = luigi.IntParameter(default=32)
     num_partitions = luigi.OptionalIntParameter(default=20)
@@ -85,9 +86,13 @@ class ProcessEmbeddings(luigi.Task):
                 .where(F.col("sample_id") == self.sample_id)
                 .drop("sample_id")
             )
+            test_df = spark.read.parquet(self.test_data_path)
+            # TODO: join with test DataFrame for the original images
+            joined_df = df.join(test_df, "image_name")
+            # TODO: implement image overlay with the masks
 
             # create the pipeline model
-            pipeline_model = self.pipeline().fit(df)
+            pipeline_model = self.pipeline().fit(joined_df)
 
             # transform the dataframe and write to disk
             transformed = self.transform(pipeline_model, df, self.feature_columns)
@@ -107,6 +112,7 @@ class Workflow(luigi.Task):
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
+    test_data_path = luigi.Parameter()
     sample_id = luigi.OptionalParameter()
     num_sample_ids = luigi.IntParameter(default=20)
     cpu_count = luigi.IntParameter(default=6)
@@ -118,6 +124,7 @@ class Workflow(luigi.Task):
         task = ProcessEmbeddings(
             input_path=self.input_path,
             output_path=self.output_path,
+            test_data_path=self.test_data_path,
             cpu_count=self.cpu_count,
             batch_size=self.batch_size,
             sample_id=0,
@@ -131,6 +138,7 @@ class Workflow(luigi.Task):
 def main(
     input_path: Annotated[str, typer.Argument(help="Input root directory")],
     output_path: Annotated[str, typer.Argument(help="Output root directory")],
+    test_data_path: Annotated[str, typer.Argument(help="Test DataFrame directory")],
     cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 4,
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
@@ -151,6 +159,7 @@ def main(
             Workflow(
                 input_path=input_path,
                 output_path=output_path,
+                test_data_path=test_data_path,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
                 num_sample_ids=num_sample_ids,
