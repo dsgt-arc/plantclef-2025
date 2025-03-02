@@ -160,7 +160,6 @@ def plot_masks_from_binary(
     mask_data_col: str,
     label_col: str,
     grid_size=(3, 3),
-    crop_square: bool = False,
     figsize: tuple = (12, 12),
     dpi: int = 80,
 ):

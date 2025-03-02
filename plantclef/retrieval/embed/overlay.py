@@ -13,6 +13,7 @@ class ProcessMaskOverlay(luigi.Task):
 
     input_path = luigi.Parameter()
     test_data_path = luigi.Parameter()
+    mask_cols = luigi.ListParameter(default=["leaf_mask", "flower_mask", "plant_mask"])
     sample_col = luigi.Parameter(default="image_name")
     sample_id = luigi.IntParameter(default=None)
     num_sample_ids = luigi.IntParameter(default=20)
@@ -26,7 +27,9 @@ class ProcessMaskOverlay(luigi.Task):
         image_array = deserialize_image(image_bytes)
         mask_array = deserialize_mask(mask_bytes)
         mask_array = np.repeat(np.expand_dims(mask_array, axis=-1), 3, axis=-1)
+        # apply overlay
         overlay_img = image_array * mask_array
+        # convert back to bytes
         overlay_pil = Image.fromarray(overlay_img)
         overlay_bytes = serialize_image(overlay_pil)
 
@@ -38,7 +41,7 @@ class ProcessMaskOverlay(luigi.Task):
         }
         with spark_resource(**kwargs) as spark:
             # read the data and keep the sample we're currently processing
-            df = (
+            mask_df = (
                 spark.read.parquet(self.input_path)
                 .withColumn(
                     "sample_id",
@@ -49,9 +52,10 @@ class ProcessMaskOverlay(luigi.Task):
                 .drop("sample_id")
             )
             test_df = spark.read.parquet(self.test_data_path)
-            joined_df = df.join(test_df, on="image_name", how="inner")
+            joined_df = mask_df.join(test_df, on="image_name", how="inner")
             # overlay the masks onto the images
-            overlay_udf = F.udf(self.transform, BinaryType())
+            apply_overlay = self.transform()
+            overlay_udf = F.udf(apply_overlay, BinaryType())
             # apply the overlay transformation
             transformed = (
                 joined_df.withColumn(

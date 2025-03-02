@@ -13,25 +13,32 @@ def temp_parquet(spark_df, tmp_path):
 
 
 @pytest.mark.parametrize(
-    "grid_size,expected_dim",
+    "grid_size,mask_cols,expected_dim",
     [
-        (4, 768),
+        (4, ["leaf_mask", "flower_mask", "plant_mask"], 768),
     ],
 )
 def test_process_embeddings(
-    spark, grid_size, expected_dim, test_mask_path, temp_parquet, tmp_path
+    spark,
+    grid_size,
+    mask_cols,
+    expected_dim,
+    test_mask_path,
+    test_data_path,
+    temp_parquet,
+    tmp_path,
 ):
     output = tmp_path / "output"
     task = ProcessEmbeddings(
         input_path=temp_parquet.as_posix(),
         output_path=output.as_posix(),
-        sample_col="image_name",
-        num_partitions=1,
+        test_data_path=test_data_path.as_posix(),
+        cpu_count=4,
         sample_id=0,
         num_sample_ids=1,
-        cpu_count=4,
         grid_size=grid_size,
-        sql_statement="SELECT image_name, tile, leaf_embed, flower_embed, plant_embed FROM __THIS__",
+        mask_cols=mask_cols,
+        num_partitions=1,
     )
     luigi.build([task], local_scheduler=True)
 

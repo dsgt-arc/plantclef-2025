@@ -1,8 +1,10 @@
 import io
 import timm
 import torch
+import numpy as np
 from PIL import Image
 from plantclef.model_setup import setup_fine_tuned_model
+from plantclef.serde import deserialize_image
 
 from .params import HasModelName, HasModelPath, HasBatchSize
 
@@ -76,6 +78,27 @@ class EmbedderFineTunedDINOv2(
                 tiles.append(tile)
         return tiles
 
+    def _deserialize_spark_image(self, input_data) -> np.ndarray:
+        """Decode the image from raw bytes using PIL."""
+        if not bytes:
+            print("[ERROR] Empty bytes received for deserialization")
+            return None
+
+        buffer = io.BytesIO(input_data)
+
+        # Debugging: Print the first few bytes
+        sample_bytes = bytes[:10] if bytes else b""
+        print(f"[DEBUG] First 10 bytes of input: {sample_bytes}")
+
+        try:
+            img = Image.open(buffer)
+            img.verify()  # Check if PIL can recognize it
+            buffer.seek(0)  # Reset buffer before reopening
+            return Image.open(buffer).convert("RGB")
+        except Exception as e:
+            print(f"[ERROR] Failed to open image: {e}")
+            return None  # Return None instead of crashing
+
     def _nvidia_smi(self):
         from subprocess import run, PIPE
 
@@ -95,18 +118,16 @@ class EmbedderFineTunedDINOv2(
         self._nvidia_smi()
 
         def predict(input_data):
-            img = Image.open(io.BytesIO(input_data))
-            tiles = self._split_into_grid(img)
+            # TODO: remove this print statement, debugging only
+            print(f"[DEBUG] input type: {type(input_data)}, length: {len(input_data)}")
+
+            img = deserialize_image(input_data).convert("RGB")
+            tiles = self._split_into_grid(np.array(img))
             results = []
             for tile in tiles:
-                processed_image = (
-                    self.transforms(tile, dtype=torch.float32)
-                    .unsqueeze(0)
-                    .unsqueeze(0)
-                    .to(self.device)
-                )
+                processed_tile = self.transforms(tile).unsqueeze(0).to(self.device)
                 with torch.no_grad():
-                    features = self.model.forward_features(processed_image)
+                    features = self.model.forward_features(processed_tile)
                     cls_token = features[:, 0, :].squeeze(0)
                 cls_embeddings = cls_token.cpu().numpy().tolist()
                 results.append(cls_embeddings)
@@ -118,7 +139,6 @@ class EmbedderFineTunedDINOv2(
         predict_fn = self._make_predict_fn()
         predict_udf = F.udf(predict_fn, ArrayType(ArrayType(FloatType())))
         # retrieve embeddings for each input column
-        tile_col = "tile"
         for idx, (input_col, output_col) in enumerate(
             zip(self.getInputCols(), self.getOutputCols())
         ):
@@ -129,7 +149,7 @@ class EmbedderFineTunedDINOv2(
             # explode embeddings so that each row has a single tile embedding
             if idx == 0:  # only explode the tile column once
                 df = df.selectExpr(
-                    "*", f"posexplode({intermediate_col}) as ({tile_col}, {output_col})"
+                    "*", f"posexplode({intermediate_col}) as (tile, {output_col})"
                 )
             else:
                 df = df.selectExpr(

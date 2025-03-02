@@ -1,15 +1,20 @@
 import luigi
 import typer
+import numpy as np
+from PIL import Image
 from typing_extensions import Annotated
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import SQLTransformer
 from pyspark.ml.functions import vector_to_array
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+from pyspark.sql.types import BinaryType
 
 from plantclef.model_setup import setup_fine_tuned_model
+from plantclef.serde import deserialize_image, deserialize_mask, serialize_image
 from .transform import EmbedderFineTunedDINOv2
-from .overlay import ProcessMaskOverlay
+
+# from .overlay import ProcessMaskOverlay
 from plantclef.spark import spark_resource
 
 
@@ -31,10 +36,7 @@ class ProcessEmbeddings(luigi.Task):
     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
     grid_size = luigi.IntParameter(default=4)
-    overlay_masks = luigi.BoolParameter(default=True)
-    sql_statement = luigi.Parameter(
-        default="SELECT image_name, tile, leaf_embed, flower_embed, plant_embed FROM __THIS__"
-    )
+    mask_cols = luigi.ListParameter(default=["leaf_mask", "flower_mask", "plant_mask"])
 
     def output(self):
         # write a partitioned dataset to disk
@@ -46,8 +48,8 @@ class ProcessEmbeddings(luigi.Task):
         model = Pipeline(
             stages=[
                 EmbedderFineTunedDINOv2(
-                    input_cols=["leaf_mask", "flower_mask", "plant_mask"],
-                    output_cols=["leaf_embed", "flower_embed", "plant_embed"],
+                    input_cols=self.input_columns,
+                    output_cols=self.feature_columns,
                     model_path=self.model_path,
                     model_name=self.model_name,
                     batch_size=self.batch_size,
@@ -59,14 +61,67 @@ class ProcessEmbeddings(luigi.Task):
         return model
 
     @property
+    def input_columns(self) -> list:
+        # input cols that will be used by the transformation
+        input_cols = self.mask_cols
+        if len(self.mask_cols) == 0:
+            input_cols = ["data"]
+        return input_cols
+
+    @property
     def feature_columns(self) -> list:
         # feature cols that will be created by the transformation
-        return ["leaf_embed", "flower_embed", "plant_embed"]
+        feature_cols = [col.replace("mask", "embed") for col in self.mask_cols]
+        if len(self.mask_cols) == 0:
+            feature_cols = ["cls_embedding"]
+        return feature_cols
 
-    def transform(self, model, df, features) -> DataFrame:
+    @property
+    def sql_statement(self) -> str:
+        mask_cols = self.feature_columns
+        mask_cols_str = ", ".join(mask_cols)
+        sql_statement = f"SELECT image_name, tile, {mask_cols_str} FROM __THIS__"
+        return sql_statement
+
+    def apply_overlay(self, image_bytes: bytes, mask_bytes: bytes) -> bytes:
+        """Overlay  the mask onto the image."""
+
+        image_array = deserialize_image(image_bytes)
+        mask_array = deserialize_mask(mask_bytes)
+        mask_array = np.repeat(np.expand_dims(mask_array, axis=-1), 3, axis=-1)
+        # apply overlay
+        overlay_img = image_array * mask_array
+        # convert back to bytes
+        overlay_pil = Image.fromarray(overlay_img)
+        overlay_bytes = serialize_image(overlay_pil)
+
+        return overlay_bytes
+
+    def transform(self, model, mask_df, test_df, features, mask_cols) -> DataFrame:
+        """Transform the dataframe by applying the model and overlaying the masks."""
+
+        # join the dataframes
+        df = mask_df.join(test_df, on="image_name", how="inner")
+
+        # apply overlay transformation to mask columns
+        overlay_udf = F.udf(self.apply_overlay, BinaryType())
+        for mask_col in self.input_columns:
+            overlay_col = mask_col.replace("mask", "overlay")
+            # TODO: remove this print statement, debugging only
+            print(f"Input cols: {mask_col}, {overlay_col}", flush=True)
+
+            df = df.withColumn(
+                overlay_col,
+                overlay_udf(F.col("data"), F.col(mask_col)),
+            )
+        # TODO: remove this print statement, debugging only
+        print("Joined Dataframe:")
+        df.printSchema()
+
+        # run model pipeline
         transformed = model.transform(df)
 
-        for c in features:
+        for c in self.feature_columns:
             # check if the feature is a vector and convert it to an array
             if "array" in transformed.schema[c].simpleString():
                 continue
@@ -78,34 +133,27 @@ class ProcessEmbeddings(luigi.Task):
             "cores": self.cpu_count,
         }
         with spark_resource(**kwargs) as spark:
-            # apply overlay masks
-            if self.overlay_masks:
-                df = ProcessMaskOverlay(
-                    input_path=self.input_path,
-                    test_data_path=self.test_data_path,
-                    sample_col=self.sample_col,
-                    sample_id=self.sample_id,
-                    cpu_count=self.cpu_count,
-                )
-                yield df
             # read the data and keep the sample we're currently processing
-            else:
-                df = (
-                    spark.read.parquet(self.input_path)
-                    .withColumn(
-                        "sample_id",
-                        F.crc32(F.col(self.sample_col).cast("string"))
-                        % self.num_sample_ids,
-                    )
-                    .where(F.col("sample_id") == self.sample_id)
-                    .drop("sample_id")
+            mask_df = (
+                spark.read.parquet(self.input_path)
+                .withColumn(
+                    "sample_id",
+                    F.crc32(F.col(self.sample_col).cast("string"))
+                    % self.num_sample_ids,
                 )
+                .where(F.col("sample_id") == self.sample_id)
+                .drop("sample_id")
+            )
+            # read test data
+            test_df = spark.read.parquet(self.test_data_path)
 
             # create the pipeline model
-            pipeline_model = self.pipeline().fit(df)
+            pipeline_model = self.pipeline().fit(mask_df)
 
             # transform the dataframe and write to disk
-            transformed = self.transform(pipeline_model, df, self.feature_columns)
+            transformed = self.transform(
+                pipeline_model, mask_df, test_df, self.feature_columns, self.mask_cols
+            )
 
             transformed.printSchema()
             transformed.explain()
@@ -128,7 +176,7 @@ class Workflow(luigi.Task):
     cpu_count = luigi.IntParameter(default=6)
     batch_size = luigi.IntParameter(default=32)
     grid_size = luigi.IntParameter(default=4)  # 4x4 grid
-    overlay_masks = luigi.BoolParameter(default=True)
+    mask_cols = luigi.ListParameter(default=["leaf_mask", "flower_mask", "plant_mask"])
     num_partitions = luigi.IntParameter(default=10)
 
     def requires(self):
@@ -141,7 +189,6 @@ class Workflow(luigi.Task):
             sample_id=0,
             num_sample_ids=1,
             grid_size=self.grid_size,
-            overlay_masks=self.overlay_masks,
             num_partitions=self.num_partitions,
         )
         yield task
@@ -156,7 +203,6 @@ def main(
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
     grid_size: Annotated[int, typer.Option(help="Grid size")] = 4,
-    overlay_masks: Annotated[bool, typer.Option(help="Overlay masks")] = True,
     num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 10,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
@@ -178,7 +224,6 @@ def main(
                 num_sample_ids=num_sample_ids,
                 sample_id=sample_id,
                 grid_size=grid_size,
-                overlay_masks=overlay_masks,
                 num_partitions=num_partitions,
             )
         ],

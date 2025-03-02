@@ -11,6 +11,13 @@ def test_mask_path() -> Path:
 
 
 @pytest.fixture
+def test_data_path() -> Path:
+    return Path(
+        "/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data/parquet/test_2024"
+    )
+
+
+@pytest.fixture
 def spark_df(test_mask_path):
     spark = get_spark(cores=1, memory="16g", app_name="pytest")
     # dataframe with masked images
