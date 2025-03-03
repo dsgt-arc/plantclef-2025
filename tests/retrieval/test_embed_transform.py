@@ -5,30 +5,44 @@ from plantclef.model_setup import setup_fine_tuned_model
 
 
 @pytest.mark.parametrize(
-    "model_name,expected_dim",
+    "model_name,expected_dim, grid_size",
     [
-        ("vit_base_patch14_reg4_dinov2.lvd142m", 768),
+        ("vit_base_patch14_reg4_dinov2.lvd142m", 768, 4),
     ],
 )
-def test_embedder_finetuned_dinov2(spark_df, model_name, expected_dim):
+def test_embedder_finetuned_dinov2(
+    spark,
+    model_name,
+    expected_dim,
+    grid_size,
+    temp_parquet,
+    test_data_path,
+):
+    # join the test data with the mask data
+    mask_df = spark.read.parquet(temp_parquet.as_posix())
+    test_df = spark.read.parquet(test_data_path.as_posix())
+    df = mask_df.join(test_df, on="image_name", how="inner")
+    print(f"df count: {df.count()}", flush=True)  # 1 row
+    # run model
     model = EmbedderFineTunedDINOv2(
-        input_col="data",
-        output_col="cls_embedding",
+        input_cols=["data"],
+        output_cols=["cls_embedding"],
         model_path=setup_fine_tuned_model(),
         model_name=model_name,
-        batch_size=2,
-        use_grid=True,
-        grid_size=3,
+        batch_size=1,
+        grid_size=grid_size,
     )
-    transformed = model.transform(spark_df).cache()
+    transformed = model.transform(df).cache()
     transformed.printSchema()
-    transformed.show()
 
-    assert transformed.count() == 3 * 3  # one image, 3x3 grid size
+    # one image, 4x4 grid size
+    count = transformed.count()
+    print(f"count: {count}", flush=True)
+    assert transformed.count() == grid_size * grid_size
     assert transformed.columns == ["image_name", "tile", "cls_embedding"]
 
     tile_values = set([row.tile for row in transformed.select("tile").collect()])
-    assert tile_values == set(range(3 * 3))
+    assert tile_values == set(range(grid_size * grid_size))
 
     row = transformed.select("cls_embedding").first()
     assert isinstance(row.cls_embedding, list)

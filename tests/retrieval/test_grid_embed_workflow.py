@@ -10,14 +10,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import BinaryType
 
 
-@pytest.fixture
-def temp_parquet(spark_df, tmp_path):
-    path = tmp_path / "data"
-    spark_df.write.parquet(path.as_posix())
-    return path
-
-
-def test_apply_overlay(spark, test_data_path, temp_parquet, tmp_path):
+def test_apply_overlay(spark, test_data_path, temp_parquet):
     # join the test data with the mask data
     mask_df = spark.read.parquet(temp_parquet.as_posix())
     test_df = spark.read.parquet(test_data_path.as_posix())
