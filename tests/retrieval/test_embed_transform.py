@@ -5,7 +5,7 @@ from plantclef.model_setup import setup_fine_tuned_model
 
 
 @pytest.mark.parametrize(
-    "model_name,expected_dim, grid_size",
+    "model_name, expected_dim, grid_size",
     [
         ("vit_base_patch14_reg4_dinov2.lvd142m", 768, 4),
     ],
@@ -15,13 +15,11 @@ def test_embedder_finetuned_dinov2(
     model_name,
     expected_dim,
     grid_size,
-    temp_parquet,
-    test_data_path,
+    temp_joined_parquet,
 ):
     # join the test data with the mask data
-    mask_df = spark.read.parquet(temp_parquet.as_posix())
-    test_df = spark.read.parquet(test_data_path.as_posix())
-    df = mask_df.join(test_df, on="image_name", how="inner")
+    df = spark.read.parquet(temp_joined_parquet.as_posix())
+    df.printSchema()
     print(f"df count: {df.count()}", flush=True)  # 1 row
     # run model
     model = EmbedderFineTunedDINOv2(
