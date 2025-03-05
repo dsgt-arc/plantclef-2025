@@ -44,15 +44,6 @@ threshold_mode="per_image"
 
 knn_path="${scratch_data_dir}/knn/${dataset_name}/k=50"
 id_map_path="${scratch_data_dir}/faiss/train/train_id_map"
-
-# top_k_str="topk_${top_k}"
-# grid_sizes_str=$(IFS=_; echo "grid_${grid_sizes[*]}")
-# output_root="${scratch_submission_dir}/${top_k_str}/${grid_sizes_str}"
-# file_name="dsgt_run_${top_k_str}_${grid_sizes_str}_p_${threshold_percentile}_${threshold_mode}"
-# output_path="${output_root}/${file_name}"
-
-# mkdir -p $output_root
-
 grid_sizes_args=$(printf "%s " "${grid_sizes[@]}")
 
 plantclef retrieval inference workflow \
