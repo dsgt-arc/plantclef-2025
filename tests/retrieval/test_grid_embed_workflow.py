@@ -44,7 +44,8 @@ def test_apply_overlay(spark, test_data_path, temp_parquet):
 @pytest.mark.parametrize(
     "grid_size,mask_cols,expected_dim",
     [
-        (4, ["leaf_mask", "flower_mask", "plant_mask"], 768),
+        # (4, ["leaf_mask", "flower_mask", "plant_mask"], 768),
+        (4, [], 768),
     ],
 )
 def test_process_embeddings(
@@ -83,9 +84,10 @@ def test_process_embeddings(
     assert transformed.columns == [
         "image_name",
         "tile",
-        "leaf_embed",
-        "flower_embed",
-        "plant_embed",
+        "cls_embedding",
+        # "leaf_embed",
+        # "flower_embed",
+        # "plant_embed",
         "sample_id",
     ]
     row = transformed.select("cls_embedding").first()

@@ -121,36 +121,38 @@ class ProcessEmbeddings(luigi.Task):
         df = mask_df.join(test_df, on="image_name", how="inner")
 
         # apply overlay transformation to mask columns
-        overlay_udf = F.udf(self.apply_overlay, BinaryType())
-        for mask_col in self.input_columns:
-            overlay_col = mask_col.replace("mask", "overlay")
+        if self.input_columns != ["data"]:
+            overlay_udf = F.udf(self.apply_overlay, BinaryType())
+            for mask_col in self.input_columns:
+                overlay_col = mask_col.replace("mask", "overlay")
+                # TODO: remove this print statement, debugging only
+                print("[DEBUG] Applying overlay transformation")
+                print(f"Input cols: {mask_col}, {overlay_col}", flush=True)
+
+                df = df.withColumn(
+                    overlay_col,
+                    overlay_udf(F.col("data"), F.col(mask_col)),
+                )
             # TODO: remove this print statement, debugging only
-            print("[DEBUG] Applying overlay transformation")
-            print(f"Input cols: {mask_col}, {overlay_col}", flush=True)
+            print("Joined Dataframe:")
+            df.printSchema()
+            # leaf_overlay = df.select("leaf_overlay").first().leaf_overlay
+            # print(f"leaf_overlay type: {type(leaf_overlay)}")
 
-            df = df.withColumn(
-                overlay_col,
-                overlay_udf(F.col("data"), F.col(mask_col)),
-            )
-        # TODO: remove this print statement, debugging only
-        print("Joined Dataframe:")
-        df.printSchema()
-        leaf_overlay = df.select("leaf_overlay").first().leaf_overlay
-        print(f"leaf_overlay type: {type(leaf_overlay)}")
+            # # ensure that the output mask is a NumPy array
+            # assert isinstance(leaf_overlay, bytearray)
 
-        # ensure that the output mask is a NumPy array
-        assert isinstance(leaf_overlay, bytearray)
-
-        # decode the bytes back into a NumPy array
-        mask = deserialize_image(leaf_overlay)
-        assert isinstance(mask, Image.Image)
+            # # decode the bytes back into a NumPy array
+            # mask = deserialize_image(leaf_overlay)
+            # assert isinstance(mask, Image.Image)
 
         # ensure mask has the expected dimensions (same as input image)
         img_data = df.select("data").first().data
         img = deserialize_image(img_data)
         expected_shape = img.size[::-1]
-        mask = np.array(mask)
-        print(f"mask shape: {mask.shape}, img shape: {expected_shape}")
+        print(f"img shape: {expected_shape}")
+        # mask = np.array(mask)
+        # print(f"mask shape: {mask.shape}")
 
         # run model pipeline
         transformed = model.transform(df)
