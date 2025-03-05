@@ -30,7 +30,9 @@ def test_embedder_finetuned_dinov2(
         batch_size=1,
         grid_size=grid_size,
     )
-    transformed = model.transform(df).cache()
+    transformed = model.transform(df)
+    df_output_cols = ", ".join(model.getOutputCols())
+    transformed = transformed.select("image_name", "tile", df_output_cols).cache()
     transformed.printSchema()
 
     # one image, 4x4 grid size

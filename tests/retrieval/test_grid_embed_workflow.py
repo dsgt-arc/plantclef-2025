@@ -73,6 +73,11 @@ def test_process_embeddings(
     # restart spark since luigi kills the spark session
     spark = get_spark(app_name="pytest")
     transformed = spark.read.parquet(f"{output}/data")
+    # output_cols = ["image_name", "tile", "leaf_embed", "flower_embed", "plant_embed"]
+    # transformed = transformed.select(
+    #     "image_name", "tile", "cls_embedding", "sample_id"
+    # ).cache()
+    transformed.printSchema()
 
     assert transformed.count() == 2
     assert transformed.columns == [

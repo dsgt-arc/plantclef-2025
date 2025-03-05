@@ -88,23 +88,29 @@ class ProcessEmbeddings(luigi.Task):
         """Overlay  the mask onto the image."""
 
         image = deserialize_image(image_bytes)  # returns Image.Image
+        print("image size:", image.size)
+        print("image type:", type(image))
         image_array = np.array(image)
         print("image_array shape:", image_array.shape)
         print("image type:", type(image_array))
         mask_array = deserialize_mask(mask_bytes)  # returns np.ndarray
         print("mask_array shape:", mask_array.shape)
+        print("mask type:", type(mask_array))
         # convert to 3 channels -> (H, W, 3)
         # mask_array = np.repeat(np.expand_dims(mask_array, axis=-1), 3, axis=-1)
         mask_array = np.expand_dims(mask_array, axis=-1)
         print("mask_array shape:", mask_array.shape)
+        print("mask type:", type(mask_array))
         # apply overlay
         overlay_img = image_array * mask_array
         print("overlay_img shape:", overlay_img.shape)
+        print("overlay_img type:", type(overlay_img))
         # convert back to bytes
         overlay_pil = Image.fromarray(overlay_img)
         print("overlay_pil shape:", overlay_pil.size)
+        print("overlay_pil type:", type(overlay_pil))
         overlay_bytes = serialize_image(overlay_pil)
-        # pdb
+        print("overlay_bytes type:", type(overlay_bytes))
 
         return overlay_bytes
 
@@ -119,6 +125,7 @@ class ProcessEmbeddings(luigi.Task):
         for mask_col in self.input_columns:
             overlay_col = mask_col.replace("mask", "overlay")
             # TODO: remove this print statement, debugging only
+            print("[DEBUG] Applying overlay transformation")
             print(f"Input cols: {mask_col}, {overlay_col}", flush=True)
 
             df = df.withColumn(
