@@ -13,6 +13,7 @@ transformers
 typer
 opencv-python
 faiss-gpu
+seaborn
 
 # developer tools
 jupyterlab
