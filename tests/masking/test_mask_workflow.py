@@ -28,7 +28,6 @@ def test_process_masking(spark, temp_parquet, tmp_path):
         input_path=temp_parquet.as_posix(),
         output_path=output.as_posix(),
         cpu_count=4,
-        batch_size=1,
         num_partitions=1,
         sample_id=0,
         num_sample_ids=1,

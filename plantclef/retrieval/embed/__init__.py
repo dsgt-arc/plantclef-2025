@@ -1,7 +1,8 @@
 import typer
-from .workflow import main as workflow_main
+from .workflow import embed, embed_with_mask
 from .mask.workflow import filter_by_mask
 
 app = typer.Typer()
-app.command("workflow")(workflow_main)
+app.command("workflow")(embed)
 app.command("filter-by-mask")(filter_by_mask)
+app.command("workflow-with-mask")(embed_with_mask)
