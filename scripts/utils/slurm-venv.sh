@@ -21,21 +21,25 @@ export CPATH="${PYTHON_ROOT}/include/python3.10:${CPATH:-}"
 mkdir -p "$VENV_PARENT_ROOT"
 pushd "$VENV_PARENT_ROOT" > /dev/null
 
+# Add local/bin to PATH
+export PATH=$HOME/.local/bin:$PATH
+
 # Create and activate the virtual environment
-echo "Creating virtual environment in ${VENV_PARENT_ROOT}/venv ..."
 if ! command -v uv &> /dev/null; then
     python -m ensurepip
     pip install --upgrade pip uv
 fi
-
-# Add local/bin to PATH
-export PATH=$HOME/.local/bin:$PATH
-
-uv venv venv
+if [[ ! -d venv ]]; then
+    echo "Creating virtual environment in ${VENV_PARENT_ROOT}/venv ..."
+    uv venv venv
+fi
 source venv/bin/activate
 
 # Install dependencies unless NO_REINSTALL is set
-if [[ -z ${NO_REINSTALL:-}  ]]; then uv pip install -e "$PROJECT_ROOT"; fi
+if [[ -z ${NO_REINSTALL:-}  ]]; then
+    uv pip install -r "$PROJECT_ROOT/requirements.txt"
+    uv pip install -e "$PROJECT_ROOT";
+fi
 
 # Verify the environment setup
 echo "Python Path: $(which python)"

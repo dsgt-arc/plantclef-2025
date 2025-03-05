@@ -2,12 +2,6 @@ import io
 import numpy as np
 import torch
 from PIL import Image
-from transformers import (
-    SamModel,
-    SamProcessor,
-    AutoProcessor,
-    AutoModelForZeroShotObjectDetection,
-)
 from typing import List
 
 from ..serde import serialize_mask
@@ -41,6 +35,17 @@ class WrappedMasking(
         checkpoint_path_sam: str = "facebook/sam-vit-huge",
         checkpoint_path_groundingdino: str = "IDEA-Research/grounding-dino-base",
     ):
+        # NOTE(anthony): move the import outside of top-level module scope
+        # because this import is doing a surprising amount of work making the cli
+        # unusable. I suppose this was the reason why the models were typically
+        # loaded in the function generator.
+        from transformers import (
+            SamModel,
+            SamProcessor,
+            AutoProcessor,
+            AutoModelForZeroShotObjectDetection,
+        )
+
         super().__init__()
         self._setDefault(
             inputCol=input_col,

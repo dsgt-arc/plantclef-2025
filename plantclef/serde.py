@@ -6,9 +6,9 @@ import zlib
 import io
 
 
-def deserialize_image(bytes: bytes) -> Image.Image:
+def deserialize_image(buffer: bytes | bytearray) -> Image.Image:
     """Decode the image from raw bytes using PIL."""
-    buffer = io.BytesIO(bytes)
+    buffer = io.BytesIO(bytes(buffer))
     return Image.open(buffer)
 
 
@@ -19,18 +19,18 @@ def serialize_image(image: Image.Image) -> bytes:
     return buffer.getvalue()
 
 
-def deserialize_mask(bytes: bytes, use_compression=True) -> np.ndarray:
+def deserialize_mask(buffer: bytes | bytearray, use_compression=True) -> np.ndarray:
     """Decode the numpy mask array from raw bytes using np.load()."""
     if use_compression:
-        bytes = zlib.decompress(bytes)
-    return np.load(io.BytesIO(bytes))
+        buffer = zlib.decompress(bytes(buffer))
+    return np.load(io.BytesIO(buffer))
 
 
 def serialize_mask(mask: np.ndarray, use_compression=True) -> bytes:
     """Encode the numpy mask array as raw bytes using np.save()."""
-    buffer = io.BytesIO()
-    np.save(buffer, mask)
-    value = buffer.getvalue()
+    fp = io.BytesIO()
+    np.save(fp, mask)
+    buffer = fp.getvalue()
     if use_compression:
-        value = zlib.compress(value)
-    return value
+        buffer = zlib.compress(buffer)
+    return buffer
