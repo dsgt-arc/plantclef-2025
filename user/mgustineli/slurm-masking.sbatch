@@ -14,7 +14,7 @@
 #SBATCH --mail-user=murilogustineli@gatech.edu  # E-mail address for notifications
 
 # for parallel runs, break into 5 jobs 5 at a time e.g.
-#SBATCH --array=0-9%10
+##SBATCH --array=0-9%10
 
 set -xe
 # export NO_REINSTALL=1
@@ -40,23 +40,22 @@ nvidia_logs_pid=$!
 echo "Started NVIDIA monitoring process with PID ${nvidia_logs_pid}"
 
 # set environment variables
-# export PYSPARK_DRIVER_MEMORY=10g
-# export PYSPARK_EXECUTOR_MEMORY=10g
-# export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
+export PYSPARK_DRIVER_MEMORY=10g
+export PYSPARK_EXECUTOR_MEMORY=10g
+export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 
 # define paths
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
-dataset_name=test_2024
+dataset_name=test_2024_subset20
 
 # Run the Python script
 plantclef masking workflow \
-    $scratch_data_dir/parquet/$dataset_name \
-    $scratch_data_dir/masking/${dataset_name}_v1 \
+    $project_data_dir/parquet/$dataset_name \
+    $project_data_dir/masking/${dataset_name}_v2 \
     --cpu-count 1 \
-    --batch-size 1 \
-    --num-sample-ids 5 \
-    --sample-id $SLURM_ARRAY_TASK_ID
+    --num-sample-ids 2 \
+    --sample-id 0
 
 # parse the nvida monitoring output
 python ~/clef/plantclef-2025/scripts/nvidia-logs.sh parse Report-${SLURM_JOB_ID}-nvidia-logs.ndjson

@@ -16,6 +16,7 @@ def serialize_image(image: Image.Image) -> bytes:
     """Encode the image as raw bytes using PIL."""
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
+    buffer.seek(0)
     return buffer.getvalue()
 
 

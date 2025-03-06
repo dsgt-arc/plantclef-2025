@@ -1,89 +1,22 @@
-import io
-
 import timm
 import torch
-from PIL import Image
-from plantclef.config import get_class_mappings_file
 from plantclef.model_setup import setup_fine_tuned_model
+from plantclef.serde import deserialize_image
+
+from .params import HasModelName, HasModelPath, HasBatchSize
+
 from pyspark.ml import Transformer
-from pyspark.ml.param import Param, Params, TypeConverters
-from pyspark.ml.param.shared import HasInputCol, HasOutputCol
+from pyspark.ml.param.shared import HasInputCols, HasOutputCols
 from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import ArrayType, FloatType, MapType, StringType
-
-
-class HasModelPath(Param):
-    """
-    Mixin for param model_path: str
-    """
-
-    modelPath = Param(
-        Params._dummy(),
-        "modelPath",
-        "The path to the fine-tuned DINOv2 model",
-        typeConverter=TypeConverters.toString,
-    )
-
-    def __init__(self):
-        super().__init__(
-            default=setup_fine_tuned_model(),
-            doc="The path to the fine-tuned DINOv2 model",
-        )
-
-    def getModelPath(self) -> str:
-        return self.getOrDefault(self.modelPath)
-
-
-class HasModelName(Param):
-    """
-    Mixin for param model_name: str
-    """
-
-    modelName = Param(
-        Params._dummy(),
-        "modelName",
-        "The name of the DINOv2 model to use",
-        typeConverter=TypeConverters.toString,
-    )
-
-    def __init__(self):
-        super().__init__(
-            default="vit_base_patch14_reg4_dinov2.lvd142m",
-            doc="The name of the DINOv2 model to use",
-        )
-
-    def getModelName(self) -> str:
-        return self.getOrDefault(self.modelName)
-
-
-class HasBatchSize(Param):
-    """
-    Mixin for param batch_size: int
-    """
-
-    batchSize = Param(
-        Params._dummy(),
-        "batchSize",
-        "The batch size to use for embedding extraction",
-        typeConverter=TypeConverters.toInt,
-    )
-
-    def __init__(self):
-        super().__init__(
-            default=32,
-            doc="The batch size to use for embedding extraction",
-        )
-
-    def getBatchSize(self) -> int:
-        return self.getOrDefault(self.batchSize)
+from pyspark.sql.types import ArrayType, FloatType
 
 
 class EmbedderFineTunedDINOv2(
     Transformer,
-    HasInputCol,
-    HasOutputCol,
+    HasInputCols,
+    HasOutputCols,
     HasModelPath,
     HasModelName,
     HasBatchSize,
@@ -96,18 +29,17 @@ class EmbedderFineTunedDINOv2(
 
     def __init__(
         self,
-        input_col: str = "input",
-        output_col: str = "output",
+        input_cols: list = ["leaf_mask", "flower_mask", "plant_mask"],
+        output_cols: list = ["leaf_embed", "flower_embed", "plant_embed"],
         model_path: str = setup_fine_tuned_model(),
         model_name: str = "vit_base_patch14_reg4_dinov2.lvd142m",
         batch_size: int = 8,
-        use_grid: bool = False,
-        grid_size: int = 3,
+        grid_size: int = 4,
     ):
         super().__init__()
         self._setDefault(
-            inputCol=input_col,
-            outputCol=output_col,
+            inputCols=input_cols,
+            outputCols=output_cols,
             modelPath=model_path,
             modelName=model_name,
             batchSize=batch_size,
@@ -128,8 +60,20 @@ class EmbedderFineTunedDINOv2(
         # Move model to GPU if available
         self.model.to(self.device)
         self.model.eval()
-        self.use_grid = use_grid
         self.grid_size = grid_size
+
+    # def _split_into_grid(self, mask_array):
+    #     """Splits the numpy mask array into grid tiles."""
+    #     h, w = mask_array.shape
+    #     grid_h, grid_w = h // self.grid_size, w // self.grid_size
+    #     tiles = []
+    #     for i in range(self.grid_size):
+    #         for j in range(self.grid_size):
+    #             tile = mask_array[
+    #                 i * grid_h : (i + 1) * grid_h, j * grid_w : (j + 1) * grid_w
+    #             ]
+    #             tiles.append(tile)
+    #     return tiles
 
     def _split_into_grid(self, image):
         w, h = image.size
@@ -164,34 +108,45 @@ class EmbedderFineTunedDINOv2(
         self._nvidia_smi()
 
         def predict(input_data):
-            img = Image.open(io.BytesIO(input_data))
-            images = [img]
-            if self.use_grid:
-                images = self._split_into_grid(img)
+            # # TODO: remove this print statement, debugging only
+            # print(f"[DEBUG] input type: {type(input_data)}", flush=True)
+            img = deserialize_image(input_data)  # Image.Image
+            # print(f"[DEBUG] img_array shape: {img.size}", flush=True)
+            # print(f"[DEBUG] img_array type: {type(img)}", flush=True)
+
+            tiles = self._split_into_grid(img)
             results = []
-            for tile in images:
-                processed_image = self.transforms(tile).unsqueeze(0).to(self.device)
+            for tile in tiles:
+                processed_tile = self.transforms(tile).unsqueeze(0).to(self.device)
                 with torch.no_grad():
-                    features = self.model.forward_features(processed_image)
+                    features = self.model.forward_features(processed_tile)
                     cls_token = features[:, 0, :].squeeze(0)
                 cls_embeddings = cls_token.cpu().numpy().tolist()
                 results.append(cls_embeddings)
             return results
 
         return predict
-        
+
     def _transform(self, df: DataFrame):
         predict_fn = self._make_predict_fn()
         predict_udf = F.udf(predict_fn, ArrayType(ArrayType(FloatType())))
-        intermediate_col = "all_" + self.getOutputCol()
-        df = df \
-            .withColumn(intermediate_col, predict_udf(F.col(self.getInputCol()))) \
-            .drop(self.getInputCol())
-        
-        # explode embeddings so that each row has a single tile embedding
-        df = df.selectExpr(
-            "*",
-            f"posexplode({intermediate_col}) as (tile, {self.getOutputCol()})"
-        ).drop(intermediate_col)
-        
+        # retrieve embeddings for each input column
+        for idx, (input_col, output_col) in enumerate(
+            zip(self.getInputCols(), self.getOutputCols())
+        ):
+            intermediate_col = f"all_{output_col}"
+            df = df.withColumn(intermediate_col, predict_udf(F.col(input_col))).drop(
+                input_col
+            )
+            # explode embeddings so that each row has a single tile embedding
+            if idx == 0:  # only explode the tile column once
+                df = df.selectExpr(
+                    "*", f"posexplode({intermediate_col}) as (tile, {output_col})"
+                )
+            else:
+                df = df.selectExpr(
+                    "*", f"posexplode({intermediate_col}) as (tmp_tile, {output_col})"
+                )
+                df = df.drop(intermediate_col).drop("tmp_tile")
+
         return df
