@@ -124,7 +124,7 @@ class Workflow(luigi.Task):
         if self.sample_id is not None:
             sample_ids = [self.sample_id]
         else:
-            sample_ids = list(range(self.num_tasks))
+            sample_ids = list(range(self.num_sample_ids))
 
         if self.use_grid:
             file_name = f"grid={self.grid_size}x{self.grid_size}"
