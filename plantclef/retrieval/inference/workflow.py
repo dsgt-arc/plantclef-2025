@@ -30,6 +30,37 @@ class RunKNNInference(luigi.Task):
     
     def output(self):
         return luigi.LocalTarget(f"{str(self.output_subdir)}/_SUCCESS")
+    
+    def _compute_min_med_per_species_df(self, joined_df):
+        """Compute the minimum median distance per species."""
+        return (
+            joined_df
+            .groupBy("image_name", "tile", "grid", "species_id")
+            .agg(median("distance").alias("med_distance"))
+            .groupBy("image_name", "species_id")
+            .agg(spark_min("med_distance").alias("min_med_distance"))
+        )
+
+    def _apply_per_image_min_med_thresholding(self, df):
+        """Apply percentile threshold per image on the minimum median distances."""
+        
+        min_med_per_species_df = self._compute_min_med_per_species_df(df)
+        window_spec = Window.partitionBy("image_name")
+        percentile_df = min_med_per_species_df.withColumn(
+            "threshold", 
+            percentile_approx("min_med_distance", self.threshold_percentile).over(window_spec)
+        )
+        return percentile_df.filter(col("min_med_distance") <= col("threshold"))
+
+    def _apply_global_min_med_thresholding(self, df):
+        """Apply percentile threshold globally across all images on the minimum median distances."""
+        
+        min_med_per_species_df = self._compute_min_med_per_species_df(df)
+        all_percentile_df = min_med_per_species_df.agg(
+            percentile_approx("min_med_distance", self.threshold_percentile).alias("threshold")
+        )
+        threshold_value = all_percentile_df.collect()[0][0]
+        return min_med_per_species_df.filter(col("min_med_distance") <= threshold_value)
         
     def run(self):
         with spark_resource(cores=self.cpu_count) as spark:
@@ -64,38 +95,15 @@ class RunKNNInference(luigi.Task):
                 )
             )
             
-            # median distance per tile per species
-            med_per_tile_species_df = (
-                joined_df
-                .groupBy("image_name", "tile", "grid", "species_id")
-                .agg(median("distance").alias("med_distance"))
-            )
-            
-            # minimum median distance per species
-            min_med_per_species_df = (
-                med_per_tile_species_df
-                .groupBy("image_name", "species_id")
-                .agg(spark_min("med_distance").alias("min_med_distance"))
-            )
-            
-            # percentile thresholding (per image or global)
+            raw_predictions_df = None
             if self.threshold_mode == "per_image":
-                window_spec = Window.partitionBy("image_name")
-                percentile_df = min_med_per_species_df.withColumn(
-                    "threshold", 
-                    percentile_approx("min_med_distance", self.threshold_percentile).over(window_spec)
-                )
-            else:
-                all_percentile_df = min_med_per_species_df.agg(
-                    percentile_approx("min_med_distance", self.threshold_percentile).alias("threshold")
-                )
-                threshold_value = all_percentile_df.collect()[0]["threshold"]
-                percentile_df = min_med_per_species_df.withColumn("threshold", lit(threshold_value))
+                raw_predictions_df = self._apply_per_image_min_med_thresholding(joined_df)
+            elif self.threshold_mode == "global":
+                raw_predictions_df = self._apply_global_min_med_thresholding(joined_df)
             
             # generate predictions
             species_groups_df = (
-                percentile_df
-                .filter(col("min_med_distance") <= col("threshold"))
+                raw_predictions_df
                 .groupBy("image_name")
                 .agg(collect_list("species_id").alias("species_ids"))
             )
