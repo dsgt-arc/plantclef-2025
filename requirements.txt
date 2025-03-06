@@ -14,7 +14,8 @@ typer
 opencv-python
 scikit-image
 faiss-gpu
-seaborn
+plottable
+huggingface_hub
 
 # developer tools
 jupyterlab
@@ -22,3 +23,4 @@ ruff
 pre-commit
 pytest
 xmltodict
+ipywidgets

@@ -1,14 +1,20 @@
 import luigi
 import typer
+import numpy as np
+from PIL import Image
 from typing_extensions import Annotated
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import SQLTransformer
 from pyspark.ml.functions import vector_to_array
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+from pyspark.sql.types import BinaryType
 
 from plantclef.model_setup import setup_fine_tuned_model
-from plantclef.retrieval.embed.transform import EmbedderFineTunedDINOv2
+from plantclef.serde import deserialize_image, deserialize_mask, serialize_image
+from .transform import EmbedderFineTunedDINOv2
+
+# from .overlay import ProcessMaskOverlay
 from plantclef.spark import spark_resource
 
 
@@ -17,6 +23,7 @@ class ProcessEmbeddings(luigi.Task):
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
+    test_data_path = luigi.Parameter()
     cpu_count = luigi.IntParameter(default=4)
     batch_size = luigi.IntParameter(default=32)
     num_partitions = luigi.OptionalIntParameter(default=20)
@@ -28,11 +35,8 @@ class ProcessEmbeddings(luigi.Task):
     # of tasks that we have in parallel to best take advantage of disk
     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
-    use_grid = luigi.BoolParameter(default=True)
-    grid_size = luigi.IntParameter(default=3)
-    sql_statement = luigi.Parameter(
-        default="SELECT image_name, tile, cls_embedding FROM __THIS__"
-    )
+    grid_size = luigi.IntParameter(default=4)
+    mask_cols = luigi.ListParameter(default=["leaf_mask", "flower_mask", "plant_mask"])
 
     def output(self):
         # write a partitioned dataset to disk
@@ -44,12 +48,11 @@ class ProcessEmbeddings(luigi.Task):
         model = Pipeline(
             stages=[
                 EmbedderFineTunedDINOv2(
-                    input_col="data",
-                    output_col="cls_embedding",
+                    input_cols=self.input_columns,
+                    output_cols=self.feature_columns,
                     model_path=self.model_path,
                     model_name=self.model_name,
                     batch_size=self.batch_size,
-                    use_grid=self.use_grid,
                     grid_size=self.grid_size,
                 ),
                 SQLTransformer(statement=self.sql_statement),
@@ -58,13 +61,103 @@ class ProcessEmbeddings(luigi.Task):
         return model
 
     @property
-    def feature_columns(self) -> list:
-        return ["cls_embedding"]
+    def input_columns(self) -> list:
+        # input cols that will be used by the transformation
+        input_cols = self.mask_cols
+        if len(self.mask_cols) == 0:
+            input_cols = ["data"]
+        return input_cols
 
-    def transform(self, model, df, features) -> DataFrame:
+    @property
+    def feature_columns(self) -> list:
+        # feature cols that will be created by the transformation
+        feature_cols = [col.replace("mask", "embed") for col in self.mask_cols]
+        if len(self.mask_cols) == 0:
+            feature_cols = ["cls_embedding"]
+        return feature_cols
+
+    @property
+    def sql_statement(self) -> str:
+        mask_cols = self.feature_columns
+        mask_cols_str = ", ".join(mask_cols)
+        sql_statement = f"SELECT image_name, tile, {mask_cols_str} FROM __THIS__"
+        return sql_statement
+
+    @staticmethod
+    def apply_overlay(image_bytes: bytes, mask_bytes: bytes) -> bytes:
+        """Overlay  the mask onto the image."""
+
+        image = deserialize_image(image_bytes)  # returns Image.Image
+        print("image size:", image.size)
+        print("image type:", type(image))
+        image_array = np.array(image)
+        print("image_array shape:", image_array.shape)
+        print("image type:", type(image_array))
+        mask_array = deserialize_mask(mask_bytes)  # returns np.ndarray
+        print("mask_array shape:", mask_array.shape)
+        print("mask type:", type(mask_array))
+        # convert to 3 channels -> (H, W, 3)
+        # mask_array = np.repeat(np.expand_dims(mask_array, axis=-1), 3, axis=-1)
+        mask_array = np.expand_dims(mask_array, axis=-1)
+        print("mask_array shape:", mask_array.shape)
+        print("mask type:", type(mask_array))
+        # apply overlay
+        overlay_img = image_array * mask_array
+        print("overlay_img shape:", overlay_img.shape)
+        print("overlay_img type:", type(overlay_img))
+        # convert back to bytes
+        overlay_pil = Image.fromarray(overlay_img)
+        print("overlay_pil shape:", overlay_pil.size)
+        print("overlay_pil type:", type(overlay_pil))
+        overlay_bytes = serialize_image(overlay_pil)
+        print("overlay_bytes type:", type(overlay_bytes))
+
+        return overlay_bytes
+
+    def transform(self, model, mask_df, test_df, features, mask_cols) -> DataFrame:
+        """Transform the dataframe by applying the model and overlaying the masks."""
+
+        # join the dataframes
+        df = mask_df.join(test_df, on="image_name", how="inner")
+
+        # apply overlay transformation to mask columns
+        if self.input_columns != ["data"]:
+            overlay_udf = F.udf(self.apply_overlay, BinaryType())
+            for mask_col in self.input_columns:
+                overlay_col = mask_col.replace("mask", "overlay")
+                # TODO: remove this print statement, debugging only
+                print("[DEBUG] Applying overlay transformation")
+                print(f"Input cols: {mask_col}, {overlay_col}", flush=True)
+
+                df = df.withColumn(
+                    overlay_col,
+                    overlay_udf(F.col("data"), F.col(mask_col)),
+                )
+            # TODO: remove this print statement, debugging only
+            print("Joined Dataframe:")
+            df.printSchema()
+            # leaf_overlay = df.select("leaf_overlay").first().leaf_overlay
+            # print(f"leaf_overlay type: {type(leaf_overlay)}")
+
+            # # ensure that the output mask is a NumPy array
+            # assert isinstance(leaf_overlay, bytearray)
+
+            # # decode the bytes back into a NumPy array
+            # mask = deserialize_image(leaf_overlay)
+            # assert isinstance(mask, Image.Image)
+
+        # ensure mask has the expected dimensions (same as input image)
+        img_data = df.select("data").first().data
+        img = deserialize_image(img_data)
+        expected_shape = img.size[::-1]
+        print(f"img shape: {expected_shape}")
+        # mask = np.array(mask)
+        # print(f"mask shape: {mask.shape}")
+
+        # run model pipeline
         transformed = model.transform(df)
 
-        for c in features:
+        for c in self.feature_columns:
             # check if the feature is a vector and convert it to an array
             if "array" in transformed.schema[c].simpleString():
                 continue
@@ -77,7 +170,7 @@ class ProcessEmbeddings(luigi.Task):
         }
         with spark_resource(**kwargs) as spark:
             # read the data and keep the sample we're currently processing
-            df = (
+            mask_df = (
                 spark.read.parquet(self.input_path)
                 .withColumn(
                     "sample_id",
@@ -87,12 +180,16 @@ class ProcessEmbeddings(luigi.Task):
                 .where(F.col("sample_id") == self.sample_id)
                 .drop("sample_id")
             )
+            # read test data
+            test_df = spark.read.parquet(self.test_data_path)
 
             # create the pipeline model
-            pipeline_model = self.pipeline().fit(df)
+            pipeline_model = self.pipeline().fit(mask_df)
 
             # transform the dataframe and write to disk
-            transformed = self.transform(pipeline_model, df, self.feature_columns)
+            transformed = self.transform(
+                pipeline_model, mask_df, test_df, self.feature_columns, self.mask_cols
+            )
 
             transformed.printSchema()
             transformed.explain()
@@ -109,29 +206,24 @@ class Workflow(luigi.Task):
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
+    test_data_path = luigi.Parameter()
     sample_id = luigi.OptionalParameter()
     num_sample_ids = luigi.IntParameter(default=20)
     cpu_count = luigi.IntParameter(default=6)
     batch_size = luigi.IntParameter(default=32)
-    # set use_grid=False to perform inference on the entire image
-    use_grid = luigi.BoolParameter(default=True)
-    grid_size = luigi.IntParameter(default=3)  # 3x3 grid
+    grid_size = luigi.IntParameter(default=4)  # 4x4 grid
+    mask_cols = luigi.ListParameter(default=["leaf_mask", "flower_mask", "plant_mask"])
     num_partitions = luigi.IntParameter(default=10)
 
     def requires(self):
-
-        if self.use_grid:
-            file_name = f"grid={self.grid_size}x{self.grid_size}"
-            output_path = f"{self.output_path}/{file_name}"
-            
         task = ProcessEmbeddings(
             input_path=self.input_path,
-            output_path=output_path,
+            output_path=self.output_path,
+            test_data_path=self.test_data_path,
             cpu_count=self.cpu_count,
             batch_size=self.batch_size,
             sample_id=0,
             num_sample_ids=1,
-            use_grid=self.use_grid,
             grid_size=self.grid_size,
             num_partitions=self.num_partitions,
         )
@@ -141,12 +233,12 @@ class Workflow(luigi.Task):
 def main(
     input_path: Annotated[str, typer.Argument(help="Input root directory")],
     output_path: Annotated[str, typer.Argument(help="Output root directory")],
+    test_data_path: Annotated[str, typer.Argument(help="Test DataFrame directory")],
     cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 4,
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
-    use_grid: Annotated[bool, typer.Option(help="Use grid")] = True,
-    grid_size: Annotated[int, typer.Option(help="Grid size")] = 3,
+    grid_size: Annotated[int, typer.Option(help="Grid size")] = 4,
     num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 10,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
@@ -162,11 +254,11 @@ def main(
             Workflow(
                 input_path=input_path,
                 output_path=output_path,
+                test_data_path=test_data_path,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
                 num_sample_ids=num_sample_ids,
                 sample_id=sample_id,
-                use_grid=use_grid,
                 grid_size=grid_size,
                 num_partitions=num_partitions,
             )
