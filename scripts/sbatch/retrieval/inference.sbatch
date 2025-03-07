@@ -3,7 +3,7 @@
 #SBATCH --account=paceship-dsgt_clef2025        # charge account
 #SBATCH --nodes=1                               # Number of nodes
 #SBATCH --cpus-per-task=16                      # Number of cores per task
-#SBATCH --mem-per-cpu=16G                       # Memory per core
+#SBATCH --mem-per-cpu=8G                        # Memory per core
 #SBATCH --time=60                               # Duration of the job (minutes)
 #SBATCH --qos=embers                            # QOS Name
 #SBATCH --output=Report-%j.log                  # Combined output and error messages file
@@ -36,7 +36,6 @@ scratch_submission_dir="${scratch_plantclef_dir}/submissions/knn"
 project_submission_dir="${project_plantclef_dir}/submissions/knn"
 dataset_name=test_2024
 
-# grid_sizes = (2 3 4 5 6)
 grid_sizes=(3 4 6)
 top_k=5
 threshold_percentile=0.05
