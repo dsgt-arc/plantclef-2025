@@ -13,8 +13,6 @@ transformers
 typer
 opencv-python
 faiss-gpu
-plottable
-huggingface_hub
 
 # developer tools
 jupyterlab

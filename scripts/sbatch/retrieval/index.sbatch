@@ -31,11 +31,13 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
 dataset_name=train
+id_map_name=train_id_map
+index_name=embeddings
 
 # run Python script
 plantclef retrieval index workflow \
     $scratch_data_dir/embeddings/$dataset_name \
-    $scratch_data_dir/faiss/$dataset_name \
+    $scratch_data_dir/faiss/$dataset_name/$id_map_name \
+    $scratch_data_dir/faiss/$dataset_name/{$index_name}.index \
     embeddings \
     --cpu-count 16
-
