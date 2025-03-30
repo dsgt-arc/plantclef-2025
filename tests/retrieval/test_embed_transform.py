@@ -27,8 +27,8 @@ def test_embedder_finetuned_dinov2(
         output_cols=["cls_embedding"],
         model_path=setup_fine_tuned_model(),
         model_name=model_name,
-        batch_size=1,
         grid_size=grid_size,
+        use_grid=True,
     )
     transformed = model.transform(df)
     df_output_cols = ", ".join(model.getOutputCols())

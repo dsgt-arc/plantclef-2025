@@ -25,6 +25,3 @@ dependencies = { file = "requirements.txt" }
 where = ["."]
 include = ["plantclef*"]
 namespaces = false
-
-[tool.uv]
-cache-dir = "~/scratch/uv-cache"

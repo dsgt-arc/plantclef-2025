@@ -60,7 +60,12 @@ class RunKNNInference(luigi.Task):
             percentile_approx("min_med_distance", self.threshold_percentile).alias("threshold")
         )
         threshold_value = all_percentile_df.collect()[0][0]
-        return min_med_per_species_df.filter(col("min_med_distance") <= threshold_value)
+        return (
+            min_med_per_species_df
+            .filter(col("min_med_distance") <= threshold_value)
+            .withColumn("rank", expr("row_number() over (partition by image_name order by min_med_distance asc)"))
+            .filter(col("rank") <= 10)
+        )
         
     def run(self):
         with spark_resource(cores=self.cpu_count) as spark:

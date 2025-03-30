@@ -5,7 +5,7 @@ import luigi
 
 from plantclef.spark import get_spark
 from plantclef.serde import deserialize_image
-from plantclef.retrieval.embed.workflow import ProcessEmbeddings
+from plantclef.retrieval.embed.workflow import ProcessEmbeddingsWithMask
 from pyspark.sql import functions as F
 from pyspark.sql.types import BinaryType
 
@@ -16,7 +16,7 @@ def test_apply_overlay(spark, test_data_path, temp_parquet):
     test_df = spark.read.parquet(test_data_path.as_posix())
     df = mask_df.join(test_df, on="image_name", how="inner")
     # apply the overlay
-    overlay_udf = F.udf(ProcessEmbeddings.apply_overlay, BinaryType())
+    overlay_udf = F.udf(ProcessEmbeddingsWithMask.apply_overlay, BinaryType())
     for mask_col in ["leaf_mask", "flower_mask", "plant_mask"]:
         overlay_col = mask_col.replace("mask", "overlay")
         df = df.withColumn(overlay_col, overlay_udf(F.col("data"), F.col(mask_col)))
@@ -58,7 +58,7 @@ def test_process_embeddings(
     tmp_path,
 ):
     output = tmp_path / "output"
-    task = ProcessEmbeddings(
+    task = ProcessEmbeddingsWithMask(
         input_path=temp_parquet.as_posix(),
         output_path=output.as_posix(),
         test_data_path=test_data_path.as_posix(),
@@ -84,11 +84,8 @@ def test_process_embeddings(
     assert transformed.columns == [
         "image_name",
         "tile",
+        "mask_type",
         "cls_embedding",
-        # "leaf_embed",
-        # "flower_embed",
-        # "plant_embed",
-        "sample_id",
     ]
     row = transformed.select("cls_embedding").first()
     assert len(row.cls_embedding) == expected_dim
