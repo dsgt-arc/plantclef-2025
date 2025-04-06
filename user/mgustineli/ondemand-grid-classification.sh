@@ -30,7 +30,7 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
 submission_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/submissions
-dataset_name=test_2024
+dataset_name=test_2025
 
 # run Python script
 plantclef classification workflow \
