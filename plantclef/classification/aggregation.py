@@ -73,7 +73,7 @@ def get_plantclef_dir() -> str:
 
 
 def write_csv_to_pace(df, file_name: str):
-    """Writes the Pandas DataFrame to a CSV file in GCS."""
+    """Writes the Pandas DataFrame to a CSV file on PACE."""
 
     # prepare and write the submission
     submission_df = prepare_and_write_submission(df)
