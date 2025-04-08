@@ -51,17 +51,22 @@ def format_species_ids(species_ids: list) -> str:
     return f"[{formatted_ids}]"
 
 
-def prepare_and_write_submission(pandas_df: pd.DataFrame) -> pd.DataFrame:
+def prepare_and_write_submission(
+    pandas_df: pd.DataFrame,
+    col: str = "image_name",
+) -> pd.DataFrame:
     """Formats the Pandas DataFrame, and writes to PACE."""
     records = []
     for _, row in pandas_df.iterrows():
         logits = row["species_ids"]
         formatted_species = format_species_ids(logits)
-        records.append(
-            {"quadrat_id": row["image_name"], "species_ids": formatted_species}
-        )
+        records.append({"quadrat_id": row[col], "species_ids": formatted_species})
 
     pandas_df = pd.DataFrame(records)
+    # remove .jpg from quadrat_id in final_df
+    pandas_df["quadrat_id"] = pandas_df["quadrat_id"].str.replace(
+        ".jpg", "", regex=False
+    )
     return pandas_df
 
 
