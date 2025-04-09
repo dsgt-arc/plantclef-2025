@@ -25,3 +25,6 @@ dependencies = { file = "requirements.txt" }
 where = ["."]
 include = ["plantclef*"]
 namespaces = false
+
+[tool.uv.workspace]
+members = ["genai"]
