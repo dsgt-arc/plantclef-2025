@@ -4,7 +4,7 @@ version = "0.1.1"
 authors = [{ name = "Murilo Gustineli", email = "murilogustineli@gatech.edu" }]
 description = "DS@GT PlantCLEF 2025 helper package"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dynamic = ["dependencies"]
 
 [project.urls]
@@ -25,3 +25,6 @@ dependencies = { file = "requirements.txt" }
 where = ["."]
 include = ["plantclef*"]
 namespaces = false
+
+[tool.uv.workspace]
+members = ["genai"]

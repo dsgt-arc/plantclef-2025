@@ -109,6 +109,7 @@ class Workflow(luigi.Task):
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
     submission_path = luigi.Parameter()
+    dataset_name = luigi.Parameter()
     sample_id = luigi.OptionalParameter()
     num_sample_ids = luigi.IntParameter(default=20)
     cpu_count = luigi.IntParameter(default=6)
@@ -152,6 +153,7 @@ class Workflow(luigi.Task):
         yield SubmissionTask(
             input_path=output_path,
             output_path=self.submission_path,
+            dataset_name=self.dataset_name,
             top_k=self.top_k_proba,
             use_grid=self.use_grid,
             grid_size=self.grid_size,
@@ -162,6 +164,7 @@ def main(
     input_path: Annotated[str, typer.Argument(help="Input root directory")],
     output_path: Annotated[str, typer.Argument(help="Output root directory")],
     submission_path: Annotated[str, typer.Argument(help="Submission root directory")],
+    dataset_name: Annotated[str, typer.Argument(help="Test dataset name")],
     cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 4,
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
@@ -185,6 +188,7 @@ def main(
                 input_path=input_path,
                 output_path=output_path,
                 submission_path=submission_path,
+                dataset_name=dataset_name,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
                 num_sample_ids=num_sample_ids,
