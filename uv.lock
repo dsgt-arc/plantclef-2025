@@ -725,10 +725,18 @@ version = "0.1.0"
 source = { virtual = "genai" }
 dependencies = [
     { name = "google-genai" },
+    { name = "pandas" },
+    { name = "tqdm" },
+    { name = "typer" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "google-genai", specifier = ">=1.9.0" }]
+requires-dist = [
+    { name = "google-genai", specifier = ">=1.9.0" },
+    { name = "pandas", specifier = ">=2.2.3" },
+    { name = "tqdm", specifier = ">=4.67.1" },
+    { name = "typer", specifier = ">=0.15.2" },
+]
 
 [[package]]
 name = "google-auth"
