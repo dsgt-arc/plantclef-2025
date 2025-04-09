@@ -37,10 +37,11 @@ plantclef classification workflow \
     $project_data_dir/parquet/$dataset_name \
     $project_data_dir/logits/${dataset_name} \
     $submission_dir \
+    $dataset_name \
     --cpu-count 6 \
     --batch-size 1 \
-    --grid-size 4 \
-    --top-k-proba 20 \
+    --grid-size 6 \
+    --top-k-proba 9 \
     --num-sample-ids 1 \
     --sample-id 0 \
 
