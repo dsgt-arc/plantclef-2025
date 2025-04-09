@@ -371,12 +371,12 @@ def process(
     print(f"Loading prompt from: {prompt_file}")
     prompt = load_text_file(prompt_file)
 
-    # 3. Load Image Files
+    # 2. Load Image Files
     print("Loading image files...")
     image_files = load_image_files()
     print(f"Loaded {len(image_files)} image files.")
 
-    # 4. Create Batches
+    # 3. Create Batches
     image_batches = load_image_batches(image_files, batch_size=batch_size)
     print(f"Created {len(image_batches)} batches of images.")
 
@@ -391,9 +391,6 @@ def process(
     # 5. (Optional) Post-processing / Validation
     if generated_json:
         print("\n--- Final Generated JSON Output ---")
-        # The output is already printed chunk by chunk, but we print the final accumulated one again
-        # for clarity, or you could parse/validate it here.
-        print("Final JSON output:")
         print(generated_json)
 
 
