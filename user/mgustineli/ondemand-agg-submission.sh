@@ -14,7 +14,7 @@ source ~/scratch/plantclef/venv/bin/activate
 # and top_k is the number of species to be selected for the final aggregation for each species
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef
-folder_name="topk_20_species_grid_4x4"  # without the .csv
+folder_name="topk_9_species_grid_6x6"  # without the .csv
 testset_name=test_2025
 top_k=10
 

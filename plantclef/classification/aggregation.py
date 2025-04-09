@@ -129,7 +129,7 @@ def main(
     sub_file_name = f"agg_{FILE_NAME}"
     write_csv_to_pace(df_final, sub_file_name, testset_name)
 
-    # top K species aggregation
+    # top-K species aggregation
     # group by base_quadrat_id and apply the updated aggregation function with top K filtering
     df_union_topk = (
         df.groupby("base_quadrat_id")["species_ids"]
