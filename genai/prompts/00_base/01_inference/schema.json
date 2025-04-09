@@ -4,6 +4,10 @@
   "items": {
     "type": "object",
     "properties": {
+      "image_name": {
+        "type": "string",
+        "description": "The filename of the analyzed image."
+      },
       "scene_description": {
         "type": "string",
         "description": "A brief summary of the quadrat's appearance for a single image, including vegetation type, cover, substrate, and notable features (under 100 words)."
@@ -17,6 +21,6 @@
         }
       }
     },
-    "required": ["scene_description", "identified_species"]
+    "required": ["image_name", "scene_description", "identified_species"]
   }
 }
