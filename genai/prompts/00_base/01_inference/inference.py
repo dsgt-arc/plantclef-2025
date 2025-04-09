@@ -1,5 +1,4 @@
 import os
-import json
 import typer
 from typing import Annotated
 from dotenv import load_dotenv
@@ -7,22 +6,6 @@ from google import genai
 from google.genai import types  # Use generative_ai for types
 
 app = typer.Typer()
-
-# --- Configuration ---
-# Define the batch of image paths you want to process
-# Add or remove image file paths here as needed.
-# Example: image_batch = ["image1.jpg", "path/to/image2.png", ...]
-IMAGE_BATCH = [
-    "CBN-PdlC-A1-20160726.jpg",
-    "CBN-Pyr-03-20230706.jpg",
-    # Add more image paths here (e.g., up to 10 or your desired batch size)
-]
-PROMPT_FILE = "PROMPT.md"
-SCHEMA_FILE = "schema.json"
-# Specify the model capable of handling multiple images and function calling/schema enforcement
-# Check Google AI documentation for the latest recommended models (e.g., gemini-1.5-pro)
-MODEL_NAME = "models/gemini-2.5-pro-latest"
-# --- End Configuration ---
 
 
 def load_text_file(filepath: str) -> str | None:
@@ -35,22 +18,6 @@ def load_text_file(filepath: str) -> str | None:
         return None
     except Exception as e:
         print(f"Error reading file {filepath}: {e}")
-        return None
-
-
-def load_json_file(filepath: str) -> dict | None:
-    """Loads JSON content from a file."""
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print(f"Error: File not found at {filepath}")
-        return None
-    except json.JSONDecodeError:
-        print(f"Error: Could not decode JSON from {filepath}")
-        return None
-    except Exception as e:
-        print(f"Error reading JSON file {filepath}: {e}")
         return None
 
 
@@ -106,21 +73,31 @@ def generate(
     prompt_template: str,
     model_name: str = "gemini-2.0-flash",
 ) -> str:
+    # get image_names from image_paths
+    image_names = [img.split("images/")[-1] for img in image_paths]
+
     # upload files to client
     files = [client.files.upload(file=img_path) for img_path in image_paths]
+
     # create a list of parts for each uploaded file
     file_parts = [
         types.Part.from_uri(file_uri=file.uri, mime_type=file.mime_type)
         for file in files
     ]
+    image_parts = [
+        types.Part.from_text(text=f"image names: {img_name}")
+        for img_name in image_names
+    ]
+
     # add the text prompt as another part
     contents = [
         types.Content(
             role="user",
-            parts=file_parts + [types.Part.from_text(text=prompt_template)],
+            parts=file_parts + image_parts,
         ),
     ]
 
+    # generate content
     generate_content_config = types.GenerateContentConfig(
         response_mime_type="application/json",
         response_schema=genai.types.Schema(
@@ -354,6 +331,7 @@ def generate(
                 },
             ),
         ),
+        system_instruction=[types.Part.from_text(text=prompt_template)],
     )
 
     for chunk in client.models.generate_content_stream(
@@ -392,23 +370,15 @@ def process(
     # 1. Load Prompt Template
     print(f"Loading prompt from: {prompt_file}")
     prompt = load_text_file(prompt_file)
-    print(f"Prompt loaded: {prompt[:50]}...")  # Print first 50 chars for brevity
-
-    # 2. Load Output Schema
-    print(f"Loading schema from: {schema_file}")
-    schema = load_json_file(schema_file)
-    print(f"Schema loaded: {schema}")  # Print the schema for verification
 
     # 3. Load Image Files
     print("Loading image files...")
     image_files = load_image_files()
     print(f"Loaded {len(image_files)} image files.")
-    print(f"Image files: {image_files[:10]}")
 
     # 4. Create Batches
     image_batches = load_image_batches(image_files, batch_size=batch_size)
     print(f"Created {len(image_batches)} batches of images.")
-    print(f"First batch: {image_batches[0]}")
 
     # 4. Run Generation
     generated_json = generate(
