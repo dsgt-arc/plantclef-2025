@@ -6,6 +6,7 @@ from pathlib import Path
 import typer
 import pandas as pd
 import tqdm
+from typing import Annotated
 
 app = typer.Typer()
 
@@ -36,10 +37,14 @@ def generate(client, input_text: str, model="gemini-2.0-flash") -> str:
 
 @app.command()
 def process(
-    input_path: str = typer.Argument(..., help="Path to the input file"),
-    output_path: str = typer.Argument(..., help="Path to the output directory"),
-    shards: int = typer.Option(1, help="Number of shards to split the input file into"),
-    limit: int = typer.Option(-1, help="Limit the number of lines to process"),
+    input_path: Annotated[str, typer.Argument(help="Path to the input file")],
+    output_path: Annotated[str, typer.Argument(help="Path to the output directory")],
+    shards: Annotated[
+        int, typer.Option(help="Number of shards to split the input file into")
+    ] = 200,
+    limit: Annotated[
+        int, typer.Option(help="Limit the number of lines to process")
+    ] = -1,
 ):
     """Take a bunch of species csv data and find information about them.
 
@@ -55,18 +60,26 @@ def process(
 
     input_file_path = Path(input_path)
     output_dir_path = Path(output_path)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
 
-    df = pd.read_csv(input_file_path, header=True)
+    df = pd.read_csv(input_file_path, header=0)  # Fixed: header should be 0, not True
     # now we shard the input data by taking the mod of the total number of shards
 
     # TODO: parallellize the process
-    for i in range(shards):
+    for i in tqdm.tqdm(list(range(shards))):
         if limit > 0 and i >= limit:
             break
         subset = df[df.species_id % shards == i]
-        print(subset)
+        # generate the text for the prompt
+        # write the text out as csv into a string
+        input_text = subset.to_csv(index=False)
+        resp_text = f"There are a total of {len(subset)} species to process.\n"
+        resp_text += "Here is the data in csv format with a header:\n"
+        resp_text = generate(client, input_text)
+        # write these out as info/part-000.yaml
+        output_file_path = output_dir_path / f"info/part-{i:03d}.yaml"
+        output_file_path.parent.mkdir(parents=True, exist_ok=True)
+        output_file_path.write_text(resp_text)
 
 
 if __name__ == "__main__":
-    process()
+    app()

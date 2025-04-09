@@ -6,14 +6,14 @@ Objective: Parse the provided text, which contains entries for multiple plant sp
     "scientific_name": "Lactuca virosa L.",
     "filter_is_vascular": true,
     "filter_is_quadrat_relevant": true,
-    "filter_is_in_europe": true,
+    "filter_is_in_sw_europe": true,
     "filter_is_in_pyrenees_med": true
   },
   {
     "scientific_name": "Crepis capillaris (L.) Wallr.",
     "filter_is_vascular": true,
     "filter_is_quadrat_relevant": true,
-    "filter_is_in_europe": true,
+    "filter_is_in_sw_europe": true,
     "filter_is_in_pyrenees_med": true
   }
 ]
@@ -43,8 +43,8 @@ JSON Schema:
         "description": "Is the plant determined to be relevant for a quadrat based on habit/size? (True=Yes, False=No, Null=Uncertain/NotFound).",
         "type": ["boolean", "null"]
       },
-      "filter_is_in_europe": {
-        "description": "Is the plant determined to be present in Europe? (True=Yes, False=No, Null=Uncertain/NotFound).",
+      "filter_is_in_sw_europe": {
+        "description": "Is the plant determined to be present in Southwestern Europe? (True=Yes, False=No, Null=Uncertain/NotFound).",
         "type": ["boolean", "null"]
       },
       "filter_is_in_pyrenees_med": {
