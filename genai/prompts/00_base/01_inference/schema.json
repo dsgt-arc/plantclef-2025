@@ -1,0 +1,22 @@
+{
+  "type": "array",
+  "description": "An array containing the analysis results for each image in a batch.",
+  "items": {
+    "type": "object",
+    "properties": {
+      "scene_description": {
+        "type": "string",
+        "description": "A brief summary of the quadrat's appearance for a single image, including vegetation type, cover, substrate, and notable features (under 100 words)."
+      },
+      "identified_species": {
+        "type": "array",
+        "description": "A list of unique scientific names (Genus species or Genus sp.) of plant species identified in that specific image.",
+        "items": {
+          "type": "string",
+          "description": "Scientific name of an identified plant species."
+        }
+      }
+    },
+    "required": ["scene_description", "identified_species"]
+  }
+}
