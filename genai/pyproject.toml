@@ -1,0 +1,16 @@
+[project]
+name = "genai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "google-genai>=1.9.0",
+    "pandas>=2.2.3",
+    "python-dotenv>=1.1.0",
+    "tqdm>=4.67.1",
+    "typer>=0.15.2",
+]
+
+[tool.setuptools]
+packages = []
