@@ -6,7 +6,10 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "google-genai>=1.9.0",
+    "ipywidgets>=8.1.5",
+    "jupyterlab>=4.4.0",
     "pandas>=2.2.3",
+    "pygbif>=0.6.5",
     "python-dotenv>=1.1.0",
     "tqdm>=4.67.1",
     "typer>=0.15.2",
