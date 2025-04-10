@@ -17,6 +17,7 @@ faiss-gpu
 plottable
 huggingface_hub
 geopy
+folium
 
 # developer tools
 jupyterlab
