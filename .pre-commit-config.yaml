@@ -19,4 +19,4 @@ repos:
     rev: v2.3.0
     hooks:
       - id: codespell
-        exclude: (package.*.json|.ipynb|CHANGELOG.md)$
+        exclude: (package.*.json|.ipynb|CHANGELOG.md|.*.json)$

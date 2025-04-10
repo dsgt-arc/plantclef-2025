@@ -17,7 +17,7 @@ app = typer.Typer()
 
 def get_schema_species() -> list[str]:
     # by default get it from whatever is checked into the repo
-    path = Path(__file__).parent / "schema.json"
+    path = Path(__file__).parent / "schema-full.json"
     d = json.loads(path.read_text())
     for p in ["items", "properties", "identified_species", "items", "enum"]:
         d = d[p]
@@ -69,7 +69,6 @@ def generate(
                         items=genai.types.Schema(
                             type=genai.types.Type.STRING,
                             description="Scientific name of an identified plant species.",
-                            enum=species,
                         ),
                     ),
                 },
@@ -80,7 +79,7 @@ def generate(
                 text=(
                     (Path(__file__).parent / "PROMPT.md").read_text()
                     + "\nYou are ONLY ALLOWED to choose from the following plant species: "
-                    + json.dumps(species)
+                    + json.dumps(species, indent=2)
                 )
             )
         ],
