@@ -16,6 +16,7 @@ scikit-image
 faiss-gpu
 plottable
 huggingface_hub
+geopy
 
 # developer tools
 jupyterlab

@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "geopy>=2.4.1",
     "google-genai>=1.9.0",
     "ipywidgets>=8.1.5",
     "jupyterlab>=4.4.0",
