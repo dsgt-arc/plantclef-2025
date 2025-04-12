@@ -28,7 +28,7 @@ file_name=${dataset_name}_grid=${grid_size}x${grid_size}
 plantclef retrieval embed workflow \
     $project_data_dir/parquet/$dataset_name \
     $project_data_dir/embeddings/$dataset_name/$file_name \
-    --cpu-count 1 \
+    --cpu-count 4 \
     --batch-size 1 \
     --num-sample-ids 1 \
     --sample-id 0 \
