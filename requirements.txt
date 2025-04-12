@@ -20,6 +20,7 @@ geopy
 folium
 shapely
 geopandas
+pacmap
 
 # developer tools
 jupyterlab
