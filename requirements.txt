@@ -18,6 +18,8 @@ plottable
 huggingface_hub
 geopy
 folium
+shapely
+geopandas
 
 # developer tools
 jupyterlab
