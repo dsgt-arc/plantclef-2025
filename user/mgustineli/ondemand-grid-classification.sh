@@ -42,7 +42,7 @@ plantclef classification workflow \
     --batch-size 1 \
     --use-grid \
     --grid-size 4 \
-    --top-k-proba 10 \
+    --top-k-proba 9 \
     --num-sample-ids 1 \
     --sample-id 0 \
 

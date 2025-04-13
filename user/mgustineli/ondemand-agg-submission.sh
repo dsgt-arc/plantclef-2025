@@ -16,7 +16,7 @@ scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef
 testset_name=test_2025
 top_k_species=10
-top_k_logits=10
+top_k_logits=9
 grid_size=4
 folder_name="topk_${top_k_logits}_species_grid_${grid_size}x${grid_size}"  # without the .csv
 
