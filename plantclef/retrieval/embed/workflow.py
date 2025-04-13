@@ -200,7 +200,6 @@ class ProcessEmbeddingsWithMask(ProcessEmbeddings):
 def embed(
     input_path: Annotated[str, typer.Argument(help="Input root directory")],
     output_path: Annotated[str, typer.Argument(help="Output root directory")],
-    test_data_path: Annotated[str, typer.Argument(help="Test DataFrame directory")],
     cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 4,
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
@@ -221,7 +220,6 @@ def embed(
             ProcessEmbeddings(
                 input_path=input_path,
                 output_path=output_path,
-                test_data_path=test_data_path,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
                 sample_id=sample_id,

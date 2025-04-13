@@ -1,8 +1,6 @@
-import io
-
 import timm
 import torch
-from PIL import Image
+from plantclef.serde import deserialize_image
 from plantclef.config import get_class_mappings_file
 from plantclef.model_setup import setup_fine_tuned_model
 from pyspark.ml import Transformer
@@ -173,7 +171,7 @@ class ClasifierFineTunedDINOv2(
         self._nvidia_smi()
 
         def predict(input_data):
-            img = Image.open(io.BytesIO(input_data))
+            img = deserialize_image(input_data)  # from bytes to PIL image
             top_k_proba = 10
             limit_logits = 10
             images = [img]

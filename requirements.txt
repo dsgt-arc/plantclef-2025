@@ -17,6 +17,10 @@ faiss-gpu
 plottable
 huggingface_hub
 geopy
+folium
+shapely
+geopandas
+pacmap
 
 # developer tools
 jupyterlab
@@ -25,3 +29,4 @@ pre-commit
 pytest
 xmltodict
 ipywidgets
+python-dotenv

@@ -169,7 +169,7 @@ def main(
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
-    use_grid: Annotated[bool, typer.Option(help="Use grid")] = True,
+    use_grid: Annotated[bool, typer.Option(help="Use grid")] = False,
     grid_size: Annotated[int, typer.Option(help="Grid size")] = 3,
     top_k_proba: Annotated[int, typer.Option(help="Top K probability")] = 5,
     num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 10,

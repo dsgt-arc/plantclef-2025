@@ -30,10 +30,10 @@ if ! command -v uv &> /dev/null; then
     pip install --upgrade pip uv
 fi
 if [[ ! -d venv ]]; then
-    echo "Creating virtual environment in ${VENV_PARENT_ROOT}/venv ..."
-    uv venv venv
+    echo "Creating virtual environment in ${VENV_PARENT_ROOT}/.venv ..."
+    uv venv .venv
 fi
-source venv/bin/activate
+source .venv/bin/activate
 
 # Install dependencies unless NO_REINSTALL is set
 if [[ -z ${NO_REINSTALL:-}  ]]; then
