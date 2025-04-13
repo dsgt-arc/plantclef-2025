@@ -74,13 +74,20 @@ def get_plantclef_dir() -> str:
     return f"{home_dir}/p-dsgt_clef2025-0/shared/plantclef/"
 
 
-def write_csv_to_pace(df, file_name: str, testset_name: str):
+def write_csv_to_pace(
+    df,
+    file_name: str,
+    testset_name: str,
+    folder_name: str,
+):
     """Writes the Pandas DataFrame to a CSV file on PACE."""
 
     # prepare and write the submission
     submission_df = prepare_and_write_submission(df)
     project_dir = get_plantclef_dir()
-    submission_path = f"{project_dir}/submissions/aggregation_seasons/{testset_name}"
+    submission_path = (
+        f"{project_dir}/submissions/aggregation_seasons/{testset_name}/{folder_name}"
+    )
     output_path = f"{submission_path}/{file_name}"
     # ensure directory exists before saving
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -127,7 +134,7 @@ def main(
     )
     # prepare and write the submission
     sub_file_name = f"agg_{FILE_NAME}"
-    write_csv_to_pace(df_final, sub_file_name, testset_name)
+    write_csv_to_pace(df_final, sub_file_name, testset_name, folder_name)
 
     # top-K species aggregation
     # group by base_quadrat_id and apply the updated aggregation function with top K filtering
@@ -149,4 +156,4 @@ def main(
         columns={"species_ids_aggregated": "species_ids"}
     )
     topk_file_name = f"agg_topk{top_k}_{FILE_NAME}"
-    write_csv_to_pace(df_final_topk, topk_file_name, testset_name)
+    write_csv_to_pace(df_final_topk, topk_file_name, testset_name, folder_name)

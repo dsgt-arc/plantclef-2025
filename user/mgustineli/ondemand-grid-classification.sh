@@ -9,7 +9,7 @@ echo "Number of CPUs: $(nproc)"
 echo "Available memory: $(free -h)"
 
 # activate the environment
-source ~/scratch/plantclef/venv/bin/activate
+source ~/scratch/plantclef/.venv/bin/activate
 
 # check GPU availability
 python -c "import torch; print(torch.cuda.is_available())"  # Check if PyTorch can access the GPU
@@ -40,8 +40,9 @@ plantclef classification workflow \
     $dataset_name \
     --cpu-count 6 \
     --batch-size 1 \
-    --grid-size 6 \
-    --top-k-proba 9 \
+    --use-grid \
+    --grid-size 4 \
+    --top-k-proba 10 \
     --num-sample-ids 1 \
     --sample-id 0 \
 
