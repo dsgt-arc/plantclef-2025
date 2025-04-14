@@ -27,7 +27,7 @@ class ProcessEmbeddings(luigi.Task):
     # controls the number of partitions written to disk, must be at least the number
     # of tasks that we have in parallel to best take advantage of disk
     sql_statement = luigi.Parameter(
-        default="SELECT image_name, species_id, cls_embedding FROM __THIS__"
+        default="SELECT image_name, species_id, cls_token, logits FROM __THIS__"
     )
     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
@@ -43,7 +43,7 @@ class ProcessEmbeddings(luigi.Task):
             stages=[
                 WrappedFineTunedDINOv2(
                     input_col="data",
-                    output_col="cls_embedding",
+                    output_col="output",
                     model_path=self.model_path,
                     model_name=self.model_name,
                     batch_size=self.batch_size,
@@ -55,7 +55,7 @@ class ProcessEmbeddings(luigi.Task):
 
     @property
     def feature_columns(self) -> list:
-        return ["cls_embedding"]
+        return "output"
 
     def transform(self, model, df, features) -> DataFrame:
         transformed = model.transform(df)
@@ -89,6 +89,9 @@ class ProcessEmbeddings(luigi.Task):
 
             # transform the dataframe and write to disk
             transformed = self.transform(pipeline_model, df, self.feature_columns)
+            transformed = transformed.select(
+                "image_name", "species_id", *self.feature_columns
+            )
 
             transformed.printSchema()
             transformed.explain()
