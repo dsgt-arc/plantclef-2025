@@ -3,7 +3,6 @@ import typer
 from typing_extensions import Annotated
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import SQLTransformer
-from pyspark.ml.functions import vector_to_array
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
@@ -26,9 +25,19 @@ class ProcessEmbeddings(luigi.Task):
     num_sample_ids = luigi.OptionalIntParameter(default=20)
     # controls the number of partitions written to disk, must be at least the number
     # of tasks that we have in parallel to best take advantage of disk
-    sql_statement = luigi.Parameter(
-        default="SELECT image_name, species_id, cls_token, logits FROM __THIS__"
-    )
+    use_test_data = luigi.BoolParameter(default=False)
+    cols = luigi.Parameter(default="image_name, species_id")
+
+    @property
+    def columns_to_use(self) -> str:
+        # Use only image_name for test set
+        columns_to_use = "image_name" if self.use_test_data else self.cols
+        return columns_to_use
+
+    @property
+    def sql_statement(self) -> str:
+        return f"SELECT {self.columns_to_use}, output FROM __THIS__"
+
     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
 
@@ -55,16 +64,12 @@ class ProcessEmbeddings(luigi.Task):
 
     @property
     def feature_columns(self) -> list:
-        return "output"
+        return ["output"]
 
     def transform(self, model, df, features) -> DataFrame:
         transformed = model.transform(df)
-
-        for c in features:
-            # check if the feature is a vector and convert it to an array
-            if "array" in transformed.schema[c].simpleString():
-                continue
-            transformed = transformed.withColumn(c, vector_to_array(F.col(c)))
+        # unpack the output column
+        transformed = transformed.select(self.columns_to_use, *self.feature_columns)
         return transformed
 
     def run(self):
@@ -89,9 +94,6 @@ class ProcessEmbeddings(luigi.Task):
 
             # transform the dataframe and write to disk
             transformed = self.transform(pipeline_model, df, self.feature_columns)
-            transformed = transformed.select(
-                "image_name", "species_id", *self.feature_columns
-            )
 
             transformed.printSchema()
             transformed.explain()
@@ -112,6 +114,7 @@ class Workflow(luigi.WrapperTask):
     cpu_count = luigi.IntParameter(default=6)
     batch_size = luigi.IntParameter(default=32)
     num_partitions = luigi.IntParameter(default=20)
+    use_test_data = luigi.BoolParameter(default=False)
 
     def requires(self):
         # either we run a single task or we run all the tasks
@@ -130,6 +133,7 @@ class Workflow(luigi.WrapperTask):
                 num_partitions=self.num_partitions,
                 sample_id=sample_id,
                 num_sample_ids=self.num_sample_ids,
+                use_test_data=self.use_test_data,
             )
             tasks.append(task)
         yield tasks
@@ -142,6 +146,7 @@ def main(
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
+    use_test_data: Annotated[bool, typer.Option(help="Use test data")] = False,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
     # run the workflow
@@ -158,8 +163,9 @@ def main(
                 output_path=output_path,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
-                num_sample_ids=num_sample_ids,
                 sample_id=sample_id,
+                num_sample_ids=num_sample_ids,
+                use_test_data=use_test_data,
             )
         ],
         **kwargs,
