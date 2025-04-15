@@ -1,0 +1,198 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "image_filename": {
+        "type": "string",
+        "description": "The filename of the specific image being analyzed."
+      },
+      "image_capture_date": {
+        "type": "string",
+        "format": "date",
+        "description": "Date the image was captured, formatted as 'YYYY-MM-DD'."
+      },
+      "derived_season": {
+        "type": "string",
+        "enum": ["Spring", "Summer", "Autumn", "Winter"],
+        "description": "Season inferred from the image capture date."
+      },
+      "metadata_inferred_region": {
+        "type": "string",
+        "description": "Geographic region hint derived from filename or metadata."
+      },
+      "metadata_inferred_ecoregion": {
+        "type": "string",
+        "description": "Ecoregion hint derived from filename or metadata."
+      },
+      "estimated_region_visual": {
+        "type": "string",
+        "description": "Visual description of the environment/region suggested by this image."
+      },
+      "habitat_predicted_types": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "List of specific habitat types predicted based on visual cues."
+      },
+      "habitat_reasoning": {
+        "type": "string",
+        "description": "Explanation of the visual evidence supporting the habitat prediction."
+      },
+      "habitat_substrate_appearance": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Descriptions of the ground substrate visible in the image."
+      },
+      "cover_veg_pct": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "description": "Estimated percentage of area covered by vegetation."
+      },
+      "cover_ground_pct": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "description": "Estimated percentage of area covered by bare soil or ground."
+      },
+      "cover_rock_pct": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "description": "Estimated percentage of area covered by rocks or gravel."
+      },
+      "cover_litter_pct": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "description": "Estimated percentage of area covered by litter (e.g., leaves, detritus)."
+      },
+      "cover_reasoning": {
+        "type": "string",
+        "description": "Justification for the cover estimates based on image content."
+      },
+      "non_plant_elements": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "List of visible non-plant items in the image."
+      },
+      "veg_dominant_forms": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Most visually dominant plant growth forms."
+      },
+      "veg_dominant_forms_reasoning": {
+        "type": "string",
+        "description": "Explanation of the dominance call for the vegetation forms."
+      },
+      "veg_height_cm": {
+        "type": "string",
+        "description": "Estimated height range of vegetation, e.g., '< 15cm'."
+      },
+      "veg_height_reasoning": {
+        "type": "string",
+        "description": "Reasoning for the estimated vegetation height."
+      },
+      "veg_canopy_structure": {
+        "type": "string",
+        "description": "Description of the canopy structure, e.g., 'Open / Patchy'."
+      },
+      "veg_canopy_reasoning": {
+        "type": "string",
+        "description": "Explanation for the canopy structure observed."
+      },
+      "veg_woodiness_observed": {
+        "type": "boolean",
+        "description": "Indicates whether woody vegetation is observed."
+      },
+      "visual_phenology_notes": {
+        "type": "string",
+        "description": "Notes on seasonal or reproductive stage of visible plants."
+      },
+      "trait_leaf_types": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Types of leaf morphology observed."
+      },
+      "trait_flower_colors": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Colors of flowers observed."
+      },
+      "trait_flower_shapes": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Shapes of flowers observed."
+      },
+      "trait_other_features": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Other notable morphological features."
+      },
+      "diversity_estimated_richness": {
+        "type": "number",
+        "description": "Number of distinct plant types/species observed."
+      },
+      "diversity_richness_confidence": {
+        "type": "string",
+        "enum": ["Low", "Medium", "High"],
+        "description": "Confidence level in the estimated richness."
+      },
+      "diversity_richness_reasoning": {
+        "type": "string",
+        "description": "Rationale for the estimated richness."
+      },
+      "taxa_suggested_groups": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Broad taxonomic groups inferred from visual evidence."
+      },
+      "taxa_groups_reasoning": {
+        "type": "string",
+        "description": "Reasoning for suggested taxonomic group(s)."
+      },
+      "summary_overall": {
+        "type": "string",
+        "description": "Overall synthesis of scene features, structure, habitat, and dominant visual traits."
+      },
+      "transcription_changes": {
+        "type": "string",
+        "description": "Notes on any changes made to the transcription of the scene."
+      }
+    },
+    "required": [
+      "image_filename",
+      "image_capture_date",
+      "derived_season",
+      "metadata_inferred_region",
+      "metadata_inferred_ecoregion",
+      "estimated_region_visual",
+      "habitat_predicted_types",
+      "habitat_reasoning",
+      "habitat_substrate_appearance",
+      "cover_veg_pct",
+      "cover_ground_pct",
+      "cover_rock_pct",
+      "cover_litter_pct",
+      "cover_reasoning",
+      "non_plant_elements",
+      "veg_dominant_forms",
+      "veg_dominant_forms_reasoning",
+      "veg_height_cm",
+      "veg_height_reasoning",
+      "veg_canopy_structure",
+      "veg_canopy_reasoning",
+      "veg_woodiness_observed",
+      "visual_phenology_notes",
+      "trait_leaf_types",
+      "trait_flower_colors",
+      "trait_flower_shapes",
+      "trait_other_features",
+      "diversity_estimated_richness",
+      "diversity_richness_confidence",
+      "diversity_richness_reasoning",
+      "summary_overall",
+      "transcription_changes"
+    ]
+  }
+}
