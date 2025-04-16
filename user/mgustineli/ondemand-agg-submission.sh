@@ -18,7 +18,7 @@ testset_name=test_2025
 top_k_species=10
 top_k_logits=9
 grid_size=4
-folder_name="topk_${top_k_logits}_species_grid_${grid_size}x${grid_size}"  # without the .csv
+folder_name="topk_${top_k_logits}_grid_${grid_size}x${grid_size}"  # without the .csv
 
 # run the aggregation script
 plantclef classification aggregation \

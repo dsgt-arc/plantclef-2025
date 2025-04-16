@@ -1,6 +1,5 @@
 import timm
 import torch
-import ast
 import pandas as pd
 from plantclef.serde import deserialize_image
 from plantclef.config import get_class_mappings_file
@@ -147,13 +146,10 @@ class ClasifierFineTunedDINOv2(
         clustering_path = "~/p-dsgt_clef2025-0/shared/plantclef/data/clustering"
         test_cluster_csv = f"{clustering_path}/test_2025_dominant_clusters.csv"
         test_cluster_probabilities = (
-            f"{clustering_path}/test_2025_embed_probabilities_clustered.csv"
+            f"{clustering_path}/test_2025_embed_probabilities_clustered"
         )
         cluster_df = pd.read_csv(test_cluster_csv)
-        probabilities_df = pd.read_csv(test_cluster_probabilities)
-        probabilities_df["species_probabilities"] = probabilities_df[
-            "species_probabilities"
-        ].apply(ast.literal_eval)
+        probabilities_df = pd.read_parquet(test_cluster_probabilities)
         return cluster_df, probabilities_df
 
     def _get_prior_for_image(self, image_name) -> dict:
@@ -162,7 +158,7 @@ class ClasifierFineTunedDINOv2(
         prior_row = self.probabilities_df[
             self.probabilities_df["dominant_cluster"] == cluster_id
         ]
-        return prior_row.iloc[0]["species_probabilities"]
+        return prior_row.iloc[0]["renormalized_probabilities"]
 
     def _split_into_grid(self, image):
         w, h = image.size
@@ -210,19 +206,17 @@ class ClasifierFineTunedDINOv2(
                 with torch.no_grad():
                     outputs = self.model(processed_image)
                     probabilities = torch.softmax(outputs, dim=1) * 100
+                    if self.use_prior:
+                        prior = self._get_prior_for_image(image_name)
+                        probabilities = probabilities * torch.tensor(prior).to(
+                            self.device
+                        )
                     top_probs, top_indices = torch.topk(probabilities, k=top_k_proba)
                 top_probs = top_probs.cpu().numpy()[0]
                 top_indices = top_indices.cpu().numpy()[0]
 
-                if self.use_prior:
-                    prior = self._get_prior_for_image(image_name=image_name)
-                    top_probs = [
-                        float(prob) * float(prior.get(str(idx), 1.0))
-                        for prob, idx in zip(top_probs, top_indices)
-                    ]
-
                 result = [
-                    {self.cid_to_spid.get(index, "Unknown"): float(prob)}
+                    {self.cid_to_spid[index]: float(prob)}
                     for index, prob in zip(top_indices, top_probs)
                 ]
                 results.append(result)

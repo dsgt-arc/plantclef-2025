@@ -34,18 +34,14 @@ class ProcessClassifier(luigi.Task):
     use_prior = luigi.BoolParameter(default=False)  # use Bayesian prior inference
     sql_statement = luigi.Parameter(default="SELECT image_name, logits FROM __THIS__")
 
+    @property
+    def _get_output_dir(self):
+        output_dir = f"{self.output_path}/sample_id={self.sample_id}"
+        return output_dir
+
     def output(self):
         # write a partitioned dataset to disk
-        return luigi.LocalTarget(f"{self.get_output_dir}/_SUCCESS")
-
-    @property
-    def get_output_dir(self):
-        output_dir = (
-            f"{self.output_path}/prior/sample_id={self.sample_id}"
-            if self.use_prior
-            else f"{self.output_path}/sample_id={self.sample_id}"
-        )
-        return output_dir
+        return luigi.LocalTarget(f"{self._get_output_dir}/_SUCCESS")
 
     def pipeline(self):
         model = Pipeline(
@@ -108,7 +104,7 @@ class ProcessClassifier(luigi.Task):
                 transformed.repartition(self.num_partitions)
                 .cache()
                 .write.mode("overwrite")
-                .parquet(self.get_output_dir)
+                .parquet(self._get_output_dir)
             )
 
 
@@ -130,6 +126,18 @@ class Workflow(luigi.Task):
     num_partitions = luigi.IntParameter(default=10)
     use_prior = luigi.BoolParameter(default=False)
 
+    def _get_base_output_path(self):
+        """Returns the base output path with consistent directory structure."""
+        base_path = self.output_path
+
+        if self.use_prior:
+            base_path = f"{base_path}_prior"
+
+        if self.use_grid:
+            base_path = f"{base_path}/grid_{self.grid_size}x{self.grid_size}"
+
+        return base_path
+
     def requires(self):
         # either we run a single task or we run all the tasks
         if self.sample_id is not None:
@@ -137,13 +145,7 @@ class Workflow(luigi.Task):
         else:
             sample_ids = list(range(self.num_sample_ids))
 
-        output_path = self.output_path
-        if self.use_prior:
-            output_path = f"{self.output_path}/prior"
-
-        if self.use_grid:
-            file_name = f"grid={self.grid_size}x{self.grid_size}"
-            output_path = f"{output_path}/{file_name}"
+        output_path = self._get_base_output_path()
 
         tasks = []
         for sample_id in sample_ids:

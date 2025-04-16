@@ -74,17 +74,9 @@ class SubmissionTask(luigi.Task):
         pandas_df = pd.DataFrame(records)
         return pandas_df
 
-    def _get_file_basename(self):
-        """Returns a clean filename base without path separators."""
-        folder_name = self._get_folder_name()
-        if self.use_prior:
-            return f"prior_{folder_name}"
-        return folder_name
-
     def _write_csv_to_pace(self, df):
         """Writes the Pandas DataFrame to a CSV file in GCS."""
-        file_basename = self._get_file_basename()
-        file_name = f"dsgt_run_{file_basename}.csv"
+        file_name = f"dsgt_run_{self._get_folder_name()}.csv"
         output_path = f"{self._get_full_output_path()}/{file_name}"
 
         # ensure directory exists before saving
