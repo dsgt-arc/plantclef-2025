@@ -217,7 +217,7 @@ class ClasifierFineTunedDINOv2(
                 if self.use_prior:
                     prior = self._get_prior_for_image(image_name=image_name)
                     top_probs = [
-                        prob * prior.get(str(idx), "Unknown")
+                        float(prob) * float(prior.get(str(idx), 1.0))
                         for prob, idx in zip(top_probs, top_indices)
                     ]
 

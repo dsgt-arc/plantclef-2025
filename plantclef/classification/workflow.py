@@ -36,14 +36,16 @@ class ProcessClassifier(luigi.Task):
 
     def output(self):
         # write a partitioned dataset to disk
-        if self.use_prior:
-            return luigi.LocalTarget(
-                f"{self.output_path}/prior/sample_id={self.sample_id}/_SUCCESS"
-            )
-        else:
-            return luigi.LocalTarget(
-                f"{self.output_path}/sample_id={self.sample_id}/_SUCCESS"
-            )
+        return luigi.LocalTarget(f"{self.get_output_dir}/_SUCCESS")
+
+    @property
+    def get_output_dir(self):
+        output_dir = (
+            f"{self.output_path}/prior/sample_id={self.sample_id}"
+            if self.use_prior
+            else f"{self.output_path}/sample_id={self.sample_id}"
+        )
+        return output_dir
 
     def pipeline(self):
         model = Pipeline(
@@ -106,7 +108,7 @@ class ProcessClassifier(luigi.Task):
                 transformed.repartition(self.num_partitions)
                 .cache()
                 .write.mode("overwrite")
-                .parquet(f"{self.output_path}/sample_id={self.sample_id}")
+                .parquet(self.get_output_dir)
             )
 
 
@@ -135,9 +137,14 @@ class Workflow(luigi.Task):
         else:
             sample_ids = list(range(self.num_sample_ids))
 
+        output_path = self.output_path
+        if self.use_prior:
+            output_path = f"{self.output_path}/prior"
+
         if self.use_grid:
             file_name = f"grid={self.grid_size}x{self.grid_size}"
-            output_path = f"{self.output_path}/{file_name}"
+            output_path = f"{output_path}/{file_name}"
+
         tasks = []
         for sample_id in sample_ids:
             task = ProcessClassifier(
@@ -158,9 +165,6 @@ class Workflow(luigi.Task):
         for task in tasks:
             yield task
 
-        if self.use_prior:
-            output_path = f"{self.output_path}/prior"
-
         # run Submission task
         yield SubmissionTask(
             input_path=output_path,
@@ -169,6 +173,7 @@ class Workflow(luigi.Task):
             top_k=self.top_k_proba,
             use_grid=self.use_grid,
             grid_size=self.grid_size,
+            use_prior=self.use_prior,
         )
 
 
