@@ -31,13 +31,19 @@ class ProcessClassifier(luigi.Task):
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
     use_grid = luigi.BoolParameter(default=True)
     grid_size = luigi.IntParameter(default=3)
+    use_prior = luigi.BoolParameter(default=False)  # use Bayesian prior inference
     sql_statement = luigi.Parameter(default="SELECT image_name, logits FROM __THIS__")
 
     def output(self):
         # write a partitioned dataset to disk
-        return luigi.LocalTarget(
-            f"{self.output_path}/sample_id={self.sample_id}/_SUCCESS"
-        )
+        if self.use_prior:
+            return luigi.LocalTarget(
+                f"{self.output_path}/prior/sample_id={self.sample_id}/_SUCCESS"
+            )
+        else:
+            return luigi.LocalTarget(
+                f"{self.output_path}/sample_id={self.sample_id}/_SUCCESS"
+            )
 
     def pipeline(self):
         model = Pipeline(
@@ -50,6 +56,7 @@ class ProcessClassifier(luigi.Task):
                     batch_size=self.batch_size,
                     use_grid=self.use_grid,
                     grid_size=self.grid_size,
+                    use_prior=self.use_prior,
                 ),
                 SQLTransformer(statement=self.sql_statement),
             ]
@@ -119,6 +126,7 @@ class Workflow(luigi.Task):
     grid_size = luigi.IntParameter(default=3)  # 3x3 grid
     top_k_proba = luigi.IntParameter(default=5)  # top 5 species
     num_partitions = luigi.IntParameter(default=10)
+    use_prior = luigi.BoolParameter(default=False)
 
     def requires(self):
         # either we run a single task or we run all the tasks
@@ -142,12 +150,16 @@ class Workflow(luigi.Task):
                 use_grid=self.use_grid,
                 grid_size=self.grid_size,
                 num_partitions=self.num_partitions,
+                use_prior=self.use_prior,
             )
             tasks.append(task)
 
         # run ProcessInference tasks before the Submission task
         for task in tasks:
             yield task
+
+        if self.use_prior:
+            output_path = f"{self.output_path}/prior"
 
         # run Submission task
         yield SubmissionTask(
@@ -173,6 +185,9 @@ def main(
     grid_size: Annotated[int, typer.Option(help="Grid size")] = 3,
     top_k_proba: Annotated[int, typer.Option(help="Top K probability")] = 5,
     num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 10,
+    use_prior: Annotated[
+        bool, typer.Option(help="Use Bayesian prior inference")
+    ] = False,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
     # run the workflow
@@ -197,6 +212,7 @@ def main(
                 grid_size=grid_size,
                 top_k_proba=top_k_proba,
                 num_partitions=num_partitions,
+                use_prior=use_prior,
             )
         ],
         **kwargs,

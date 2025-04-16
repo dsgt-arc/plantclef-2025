@@ -1,5 +1,7 @@
 import timm
 import torch
+import ast
+import pandas as pd
 from plantclef.serde import deserialize_image
 from plantclef.config import get_class_mappings_file
 from plantclef.model_setup import setup_fine_tuned_model
@@ -101,6 +103,7 @@ class ClasifierFineTunedDINOv2(
         batch_size: int = 8,
         use_grid: bool = False,
         grid_size: int = 3,
+        use_prior: bool = False,
     ):
         super().__init__()
         self._setDefault(
@@ -130,13 +133,36 @@ class ClasifierFineTunedDINOv2(
         self.class_mapping_file = get_class_mappings_file()
         # load class mappings
         self.cid_to_spid = self._load_class_mapping()
+        self.cluster_df, self.probabilities_df = self._get_cluster_probability_dfs()
         self.use_grid = use_grid
         self.grid_size = grid_size
+        self.use_prior = use_prior
 
     def _load_class_mapping(self):
         with open(self.class_mapping_file) as f:
             class_index_to_class_name = {i: line.strip() for i, line in enumerate(f)}
         return class_index_to_class_name
+
+    def _get_cluster_probability_dfs(self):
+        clustering_path = "~/p-dsgt_clef2025-0/shared/plantclef/data/clustering"
+        test_cluster_csv = f"{clustering_path}/test_2025_dominant_clusters.csv"
+        test_cluster_probabilities = (
+            f"{clustering_path}/test_2025_embed_probabilities_clustered.csv"
+        )
+        cluster_df = pd.read_csv(test_cluster_csv)
+        probabilities_df = pd.read_csv(test_cluster_probabilities)
+        probabilities_df["species_probabilities"] = probabilities_df[
+            "species_probabilities"
+        ].apply(ast.literal_eval)
+        return cluster_df, probabilities_df
+
+    def _get_prior_for_image(self, image_name) -> dict:
+        row = self.cluster_df[self.cluster_df["image_name"] == image_name]
+        cluster_id = row.iloc[0]["kmeans_cluster"]
+        prior_row = self.probabilities_df[
+            self.probabilities_df["dominant_cluster"] == cluster_id
+        ]
+        return prior_row.iloc[0]["species_probabilities"]
 
     def _split_into_grid(self, image):
         w, h = image.size
@@ -170,7 +196,7 @@ class ClasifierFineTunedDINOv2(
         # check on the nvidia stats when generating the predict function
         self._nvidia_smi()
 
-        def predict(input_data):
+        def predict(input_data, image_name):
             img = deserialize_image(input_data)  # from bytes to PIL image
             top_k_proba = 10
             limit_logits = 10
@@ -187,6 +213,14 @@ class ClasifierFineTunedDINOv2(
                     top_probs, top_indices = torch.topk(probabilities, k=top_k_proba)
                 top_probs = top_probs.cpu().numpy()[0]
                 top_indices = top_indices.cpu().numpy()[0]
+
+                if self.use_prior:
+                    prior = self._get_prior_for_image(image_name=image_name)
+                    top_probs = [
+                        prob * prior.get(str(idx), "Unknown")
+                        for prob, idx in zip(top_probs, top_indices)
+                    ]
+
                 result = [
                     {self.cid_to_spid.get(index, "Unknown"): float(prob)}
                     for index, prob in zip(top_indices, top_probs)
@@ -208,5 +242,6 @@ class ClasifierFineTunedDINOv2(
         predict_fn = self._make_predict_fn()
         predict_udf = F.udf(predict_fn, ArrayType(MapType(StringType(), FloatType())))
         return df.withColumn(
-            self.getOutputCol(), predict_udf(F.col(self.getInputCol()))
+            self.getOutputCol(),
+            predict_udf(F.col(self.getInputCol()), F.col("image_name")),
         )

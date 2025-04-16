@@ -45,6 +45,7 @@ plantclef classification workflow \
     --top-k-proba 9 \
     --num-sample-ids 1 \
     --sample-id 0 \
+    --use-prior \
 
 # parse the nvida monitoring output
 python ~/clef/plantclef-2025/scripts/nvidia-logs.sh parse Report-${SLURM_JOB_ID}-nvidia-logs.ndjson
