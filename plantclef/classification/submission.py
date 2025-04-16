@@ -15,14 +15,35 @@ class SubmissionTask(luigi.Task):
     top_k = luigi.OptionalIntParameter(default=5)
     use_grid = luigi.OptionalBoolParameter(default=False)
     grid_size = luigi.OptionalIntParameter(default=3)
+    use_prior = luigi.OptionalBoolParameter(default=False)
+
+    def _get_folder_name(self):
+        """Returns the folder name based on parameters."""
+        folder_name = f"topk_{self.top_k}"
+
+        if self.use_grid:
+            folder_name = f"{folder_name}_grid_{self.grid_size}x{self.grid_size}"
+
+        return folder_name
+
+    def _get_full_output_path(self, with_success=False):
+        """Returns the full output path with optional _SUCCESS suffix."""
+        folder_name = self._get_folder_name()
+
+        # build the path with prior as a directory if needed
+        if self.use_prior:
+            path = f"{self.output_path}/{self.dataset_name}_prior/{folder_name}"
+        else:
+            path = f"{self.output_path}/{self.dataset_name}/{folder_name}"
+
+        if with_success:
+            path = f"{path}/_SUCCESS"
+
+        return path
 
     def output(self):
-        # save the model run
-        output_path = (
-            f"{self.output_path}/{self.dataset_name}/topk_{self.top_k}_species/_SUCCESS"
-        )
-        if self.use_grid:
-            output_path = f"{self.output_path}/{self.dataset_name}/topk_{self.top_k}_species_grid_{self.grid_size}x{self.grid_size}/_SUCCESS"
+        # Get path with _SUCCESS marker
+        output_path = self._get_full_output_path(with_success=True)
         return luigi.LocalTarget(output_path)
 
     def _format_species_ids(self, species_ids: list) -> str:
@@ -55,14 +76,8 @@ class SubmissionTask(luigi.Task):
 
     def _write_csv_to_pace(self, df):
         """Writes the Pandas DataFrame to a CSV file in GCS."""
-        folder_name = f"topk_{self.top_k}_species"
-        if self.use_grid:
-            grid_name = f"grid_{self.grid_size}x{self.grid_size}"
-            folder_name = f"{folder_name}_{grid_name}"
-        file_name = f"dsgt_run_{folder_name}.csv"
-        output_path = (
-            f"{self.output_path}/{self.dataset_name}/{folder_name}/{file_name}"
-        )
+        file_name = f"dsgt_run_{self._get_folder_name()}.csv"
+        output_path = f"{self._get_full_output_path()}/{file_name}"
 
         # ensure directory exists before saving
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -74,6 +89,8 @@ class SubmissionTask(luigi.Task):
     def run(self):
         with spark_resource() as spark:
             # read data
+            print("=== Reading data ===")
+            print(f"Reading data from: {self.input_path}")
             transformed_df = spark.read.parquet(self.input_path)
             transformed_df = transformed_df.orderBy("image_name")
             transformed_df.printSchema()
