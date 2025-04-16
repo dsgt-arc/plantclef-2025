@@ -89,6 +89,8 @@ class SubmissionTask(luigi.Task):
     def run(self):
         with spark_resource() as spark:
             # read data
+            print("=== Reading data ===")
+            print(f"Reading data from: {self.input_path}")
             transformed_df = spark.read.parquet(self.input_path)
             transformed_df = transformed_df.orderBy("image_name")
             transformed_df.printSchema()
