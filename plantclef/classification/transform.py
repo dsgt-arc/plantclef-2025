@@ -220,7 +220,7 @@ class ClasifierFineTunedDINOv2(
                     for index, prob in zip(top_indices, top_probs)
                 ]
                 results.append(result)
-            # flatten the results from all grids, get top 5 probabilities
+            # flatten the results from all grids, get top probabilities
             flattened_results = [
                 item for grid in results for item in grid[:limit_logits]
             ]

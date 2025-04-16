@@ -32,7 +32,7 @@ class SubmissionTask(luigi.Task):
 
         # build the path with prior as a directory if needed
         if self.use_prior:
-            path = f"{self.output_path}/{self.dataset_name}/prior/{folder_name}"
+            path = f"{self.output_path}/{self.dataset_name}_prior/{folder_name}"
         else:
             path = f"{self.output_path}/{self.dataset_name}/{folder_name}"
 
