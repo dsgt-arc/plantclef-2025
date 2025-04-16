@@ -1,17 +1,15 @@
-import io
-
-import numpy as np
 import timm
 import torch
-from PIL import Image
+import numpy as np
+from plantclef.serde import deserialize_image
 from plantclef.model_setup import setup_fine_tuned_model
+from pyspark.sql import DataFrame
 from pyspark.ml import Transformer
 from pyspark.ml.param import Param, Params, TypeConverters
 from pyspark.ml.functions import predict_batch_udf
 from pyspark.ml.param.shared import HasInputCol, HasOutputCol
 from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
-from pyspark.sql import DataFrame
-from pyspark.sql.types import ArrayType, FloatType
+from pyspark.sql.types import ArrayType, FloatType, StructType, StructField
 
 
 class HasModelPath(Param):
@@ -112,19 +110,21 @@ class WrappedFineTunedDINOv2(
         )
         self.num_classes = 7806  # total number of plant species
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = timm.create_model(
-            self.getModelName(),
-            pretrained=False,
-            num_classes=self.num_classes,
-            checkpoint_path=self.getModelPath(),
+        self.model = (
+            timm.create_model(
+                self.getModelName(),
+                pretrained=False,
+                num_classes=self.num_classes,
+                checkpoint_path=self.getModelPath(),
+            )
+            .to(self.device)
+            .eval()
         )
-        # Data transform
+        # data transform
         self.data_config = timm.data.resolve_model_data_config(self.model)
         self.transforms = timm.data.create_transform(
             **self.data_config, is_training=False
         )
-        # Move model to GPU if available
-        self.model.to(self.device)
 
     def _nvidia_smi(self):
         from subprocess import run, PIPE
@@ -142,32 +142,40 @@ class WrappedFineTunedDINOv2(
         """Return PredictBatchFunction using a closure over the model"""
 
         # check on the nvidia stats when generating the predict function
-        self._nvidia_smi()
+        # self._nvidia_smi()
 
-        def predict(inputs: np.ndarray) -> np.ndarray:
-            images = []
-            for input in inputs:
-                img = Image.open(io.BytesIO(input)).convert("RGB")  # convert to RGB
-                images.append(self.transforms(img).to(self.device))
-
-            model_inputs = torch.stack(images)  # stack the images
+        def predict(image_batch: np.ndarray) -> np.ndarray:
+            images = [self.transforms(deserialize_image(img)) for img in image_batch]
+            model_inputs = torch.stack(images).to(self.device)
 
             with torch.no_grad():
-                features = self.model.forward_features(model_inputs)
-                cls_token = features[:, 0, :]  # extract [CLS] token embeddings
+                outputs = self.model(model_inputs).cpu().numpy()
+                features = self.model.forward_features(model_inputs).cpu().numpy()
+                cls_token = features[:, 0, :]
 
-            # return the computed embeddings as numpy array
-            numpy_array = cls_token.cpu().numpy()
-            return numpy_array
+            return [
+                {
+                    "cls_token": cls_token[i],
+                    "logits": outputs[i],
+                }
+                for i in range(len(image_batch))
+            ]
 
         return predict
 
     def _transform(self, df: DataFrame):
+        schema = StructType(
+            [
+                StructField("cls_token", ArrayType(FloatType())),
+                StructField("logits", ArrayType(FloatType())),
+            ]
+        )
+
         return df.withColumn(
             self.getOutputCol(),
             predict_batch_udf(
                 make_predict_fn=self._make_predict_fn,
-                return_type=ArrayType(FloatType()),
+                return_type=schema,
                 batch_size=self.getBatchSize(),
             )(self.getInputCol()),
         )

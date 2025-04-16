@@ -21,6 +21,7 @@ folium
 shapely
 geopandas
 pacmap
+umap-learn
 
 # developer tools
 jupyterlab
