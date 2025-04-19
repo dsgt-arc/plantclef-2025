@@ -225,10 +225,8 @@ class ClasifierFineTunedDINOv2(
                 item for grid in results for item in grid[:limit_logits]
             ]
             # sort by score in descending order
-            sorted_logits = sorted(
-                flattened_results, key=lambda x: -list(x.values())[0]
-            )
-            return sorted_logits
+            sorted_preds = sorted(flattened_results, key=lambda x: -list(x.values())[0])
+            return sorted_preds
 
         return predict
 
