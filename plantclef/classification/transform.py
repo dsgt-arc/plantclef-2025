@@ -102,7 +102,7 @@ class ClasifierFineTunedDINOv2(
         batch_size: int = 8,
         use_grid: bool = False,
         grid_size: int = 3,
-        use_prior: bool = False,
+        prior_path: str = None,
     ):
         super().__init__()
         self._setDefault(
@@ -132,33 +132,24 @@ class ClasifierFineTunedDINOv2(
         self.class_mapping_file = get_class_mappings_file()
         # load class mappings
         self.cid_to_spid = self._load_class_mapping()
-        self.cluster_df, self.probabilities_df = self._get_cluster_probability_dfs()
         self.use_grid = use_grid
         self.grid_size = grid_size
-        self.use_prior = use_prior
+        self.prior_path = prior_path
+        self.prior_df = self._get_prior_df()
 
     def _load_class_mapping(self):
         with open(self.class_mapping_file) as f:
             class_index_to_class_name = {i: line.strip() for i, line in enumerate(f)}
         return class_index_to_class_name
 
-    def _get_cluster_probability_dfs(self):
-        clustering_path = "~/p-dsgt_clef2025-0/shared/plantclef/data/clustering"
-        test_cluster_csv = f"{clustering_path}/test_2025_dominant_clusters.csv"
-        test_cluster_probabilities = (
-            f"{clustering_path}/test_2025_embed_probabilities_clustered"
-        )
-        cluster_df = pd.read_csv(test_cluster_csv)
-        probabilities_df = pd.read_parquet(test_cluster_probabilities)
-        return cluster_df, probabilities_df
+    def _get_prior_df(self):
+        return pd.read_parquet(self.prior_path)
 
     def _get_prior_for_image(self, image_name) -> dict:
-        row = self.cluster_df[self.cluster_df["image_name"] == image_name]
-        cluster_id = row.iloc[0]["kmeans_cluster"]
-        prior_row = self.probabilities_df[
-            self.probabilities_df["dominant_cluster"] == cluster_id
-        ]
-        return prior_row.iloc[0]["renormalized_probabilities"]
+        # get prior probabilities for image
+        prior_row = self.prior_df[self.prior_df["image_name"] == image_name]
+        prior_row = prior_row.iloc[0]["prior_probabilities"]
+        return prior_row
 
     def _split_into_grid(self, image):
         w, h = image.size
@@ -206,11 +197,14 @@ class ClasifierFineTunedDINOv2(
                 with torch.no_grad():
                     outputs = self.model(processed_image)
                     probabilities = torch.softmax(outputs, dim=1) * 100
-                    if self.use_prior:
+
+                    # use Prior probabilities
+                    if self.prior_path:
                         prior = self._get_prior_for_image(image_name)
                         probabilities = probabilities * torch.tensor(prior).to(
                             self.device
                         )
+
                     top_probs, top_indices = torch.topk(probabilities, k=top_k_proba)
                 top_probs = top_probs.cpu().numpy()[0]
                 top_indices = top_indices.cpu().numpy()[0]
