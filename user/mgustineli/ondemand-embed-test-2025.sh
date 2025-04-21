@@ -21,14 +21,18 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
 dataset_name=test_2025
+grid_size=4
+# file_name=${dataset_name}_embed_logits
 file_name=${dataset_name}_grid=${grid_size}x${grid_size}
 
 # run the Python script
 plantclef embedding workflow \
     $project_data_dir/parquet/$dataset_name \
-    $project_data_dir/embeddings/$dataset_name/${dataset_name}_embed_logits \
+    $project_data_dir/embeddings/$dataset_name/$file_name \
     --cpu-count 4 \
     --batch-size 1 \
     --sample-id 0 \
     --num-sample-ids 1 \
     --use-test-data \
+    --use-grid \
+    --grid-size $grid_size \
