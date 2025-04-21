@@ -163,6 +163,7 @@ cython_debug/
 
 *.out
 *.ndjson
-*.png
+# *.png
 *.csv
 logs/
+logs_embed
