@@ -15,12 +15,25 @@ class SubmissionTask(luigi.Task):
     top_k = luigi.OptionalIntParameter(default=5)
     use_grid = luigi.OptionalBoolParameter(default=False)
     grid_size = luigi.OptionalIntParameter(default=3)
-    use_prior = luigi.OptionalBoolParameter(default=False)
+    prior_path = luigi.Parameter(default=None)
+
+    def _get_prior_name(self):
+        if self.prior_path:
+            prior_name = self.prior_path.split("test_2025_")[-1]
+            if "cluster" in prior_name:
+                prior_name = "cluster"
+            elif "image" in prior_name:
+                prior_name = "image"
+            return prior_name
+        return None
 
     def _get_folder_name(self):
         """Returns the folder name based on parameters."""
         folder_name = f"topk_{self.top_k}"
+        prior_name = self._get_prior_name()
 
+        if self.prior_path:
+            folder_name = f"prior_{prior_name}_{folder_name}"
         if self.use_grid:
             folder_name = f"{folder_name}_grid_{self.grid_size}x{self.grid_size}"
 
@@ -29,10 +42,11 @@ class SubmissionTask(luigi.Task):
     def _get_full_output_path(self, with_success=False):
         """Returns the full output path with optional _SUCCESS suffix."""
         folder_name = self._get_folder_name()
+        prior_name = self._get_prior_name()
 
         # build the path with prior as a directory if needed
-        if self.use_prior:
-            path = f"{self.output_path}/{self.dataset_name}_prior/{folder_name}"
+        if self.prior_path:
+            path = f"{self.output_path}/{self.dataset_name}_prior_{prior_name}/{folder_name}"
         else:
             path = f"{self.output_path}/{self.dataset_name}/{folder_name}"
 
