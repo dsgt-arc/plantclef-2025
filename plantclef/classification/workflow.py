@@ -31,7 +31,7 @@ class ProcessClassifier(luigi.Task):
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
     use_grid = luigi.BoolParameter(default=True)
     grid_size = luigi.IntParameter(default=3)
-    prior_path = luigi.Parameter(default=None)  # use Bayesian prior inference
+    use_prior = luigi.BoolParameter(default=False)  # use Bayesian prior inference
     sql_statement = luigi.Parameter(default="SELECT image_name, logits FROM __THIS__")
 
     @property
@@ -54,7 +54,7 @@ class ProcessClassifier(luigi.Task):
                     batch_size=self.batch_size,
                     use_grid=self.use_grid,
                     grid_size=self.grid_size,
-                    prior_path=self.prior_path,
+                    use_prior=self.use_prior,
                 ),
                 SQLTransformer(statement=self.sql_statement),
             ]
@@ -124,24 +124,14 @@ class Workflow(luigi.Task):
     grid_size = luigi.IntParameter(default=3)  # 3x3 grid
     top_k_proba = luigi.IntParameter(default=5)  # top 5 species
     num_partitions = luigi.IntParameter(default=10)
-    prior_path = luigi.Parameter(default=None)
-
-    @property
-    def _get_prior_folder_name(self):
-        """Returns the folder name based on prior path."""
-        prior_name = self.prior_path.split("test_2025_")[-1]
-        if "cluster" in prior_name:
-            prior_name = "cluster"
-        elif "image" in prior_name:
-            prior_name = "image"
-        return prior_name
+    use_prior = luigi.BoolParameter(default=False)
 
     def _get_base_output_path(self):
         """Returns the base output path with consistent directory structure."""
         base_path = self.output_path
 
-        if self.prior_path:
-            base_path = f"{base_path}_prior_{self._get_prior_folder_name}"
+        if self.use_prior:
+            base_path = f"{base_path}_prior"
 
         if self.use_grid:
             base_path = f"{base_path}/grid_{self.grid_size}x{self.grid_size}"
@@ -169,7 +159,7 @@ class Workflow(luigi.Task):
                 use_grid=self.use_grid,
                 grid_size=self.grid_size,
                 num_partitions=self.num_partitions,
-                prior_path=self.prior_path,
+                use_prior=self.use_prior,
             )
             tasks.append(task)
 
@@ -185,7 +175,7 @@ class Workflow(luigi.Task):
             top_k=self.top_k_proba,
             use_grid=self.use_grid,
             grid_size=self.grid_size,
-            prior_path=self.prior_path,
+            use_prior=self.use_prior,
         )
 
 
@@ -202,7 +192,9 @@ def main(
     grid_size: Annotated[int, typer.Option(help="Grid size")] = 3,
     top_k_proba: Annotated[int, typer.Option(help="Top K probability")] = 5,
     num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 10,
-    prior_path: Annotated[str, typer.Option(help="Prior dataframe path")] = None,
+    use_prior: Annotated[
+        bool, typer.Option(help="Use Bayesian prior inference")
+    ] = False,
     scheduler_host: Annotated[str, typer.Option(help="Scheduler host")] = None,
 ):
     # run the workflow
@@ -227,7 +219,7 @@ def main(
                 grid_size=grid_size,
                 top_k_proba=top_k_proba,
                 num_partitions=num_partitions,
-                prior_path=prior_path,
+                use_prior=use_prior,
             )
         ],
         **kwargs,
