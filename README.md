@@ -1,5 +1,7 @@
 # plantclef-2025
 
+![](./figures/plantclef-2025-banner.png)
+
 ## Repository Structure
 
 The repository is organized as follows:
