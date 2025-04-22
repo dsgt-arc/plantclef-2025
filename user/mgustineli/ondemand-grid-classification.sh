@@ -38,7 +38,7 @@ plantclef classification workflow \
     --batch-size 1 \
     --use-grid \
     --grid-size 4 \
-    --top-k-proba 9 \
+    --top-k-proba 12 \
     --num-sample-ids 1 \
     --sample-id 0 \
-    --prior-path $project_data_dir/prior/$prior_dir \
+    # --prior-path $project_data_dir/prior/$prior_dir \

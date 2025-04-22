@@ -143,7 +143,8 @@ class ClasifierFineTunedDINOv2(
         return class_index_to_class_name
 
     def _get_prior_df(self):
-        return pd.read_parquet(self.prior_path)
+        if self.prior_path:
+            return pd.read_parquet(self.prior_path)
 
     def _get_prior_for_image(self, image_name) -> dict:
         # get prior probabilities for image
