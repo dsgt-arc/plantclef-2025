@@ -30,7 +30,6 @@ dependencies = [
     "geopandas",
     "pacmap",
     "umap-learn",
-    "supervision>=0.24.0",
 ]
 
 [project.optional-dependencies]
