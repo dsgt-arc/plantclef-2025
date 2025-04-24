@@ -5,7 +5,45 @@ authors = [{ name = "Murilo Gustineli", email = "murilogustineli@gatech.edu" }]
 description = "DS@GT PlantCLEF 2025 helper package"
 readme = "README.md"
 requires-python = ">=3.9"
-dynamic = ["dependencies"]
+dependencies = [
+    "numpy<2",
+    "pandas",
+    "matplotlib",
+    "scikit-learn",
+    "tqdm",
+    "pyspark>=3.4.0",
+    "pyarrow",
+    "luigi",
+    "aria2",
+    "torch",
+    "timm",
+    "transformers",
+    "typer",
+    "opencv-python",
+    "scikit-image",
+    "faiss-gpu",
+    "plottable",
+    "huggingface_hub",
+    "geopy",
+    "folium",
+    "shapely",
+    "geopandas",
+    "pacmap",
+    "umap-learn",
+    "supervision>=0.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "jupyterlab",
+    "ruff",
+    "pre-commit",
+    "pytest",
+    "xmltodict",
+    "ipywidgets",
+    "python-dotenv",
+    "pace-job-monitoring@git+https://github.com/dsgt-kaggle-clef/pace-job-monitoring.git#main"
+]
 
 [project.urls]
 Homepage = "https://github.com/dsgt-kaggle-clef/plantclef-2025"
@@ -17,9 +55,6 @@ plantclef = "plantclef.cli:app"
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools.dynamic]
-dependencies = { file = "requirements.txt" }
 
 [tool.setuptools.packages.find]
 where = ["."]
