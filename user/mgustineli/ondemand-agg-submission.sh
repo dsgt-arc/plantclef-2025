@@ -14,9 +14,9 @@ source ~/scratch/plantclef/.venv/bin/activate
 # and top_k is the number of species to be selected for the final aggregation for each species
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef
-testset_name=test_2025_prior
+testset_name=test_2025  # test_2025_prior
 top_k_species=10
-top_k_logits=9
+top_k_logits=10
 grid_size=4
 folder_name="topk_${top_k_logits}_grid_${grid_size}x${grid_size}"  # without the .csv
 
@@ -28,8 +28,11 @@ plantclef classification aggregation \
     --top-k $top_k_species \
 
 # run the geolocation script on the aggregation submisssion results
-file_name="agg_topk${top_k_species}_dsgt_run_${folder_name}.csv"
+# file_name="agg_topk${top_k_species}_dsgt_run_${folder_name}.csv"
+file_name="dsgt_run_${folder_name}" # regular tiling, without aggregations
+submission_dir="$project_data_dir/submissions/$testset_name/$folder_name"
 plantclef classification aggregation_geolocation \
+    $project_data_dir/submissions/$testset_name/$folder_name \
     $file_name \
-    $testset_name \
+    $submission_dir \
     --folder-name $folder_name \

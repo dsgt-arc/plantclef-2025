@@ -9,12 +9,10 @@ from pathlib import Path
 
 def get_pandas_dataframe(
     input_path: str,
-    folder_name: str,
     file_name: str,
 ) -> pd.DataFrame:
     # read CSV file
-    file_path = f"{folder_name}/{file_name}"
-    df = pd.read_csv(f"{input_path}/{file_path}", delimiter=",")
+    df = pd.read_csv(f"{input_path}/{file_name}.csv", delimiter=",")
     return df
 
 
@@ -65,18 +63,13 @@ def get_plantclef_dir() -> str:
 def write_csv_to_pace(
     df,
     file_name: str,
-    testset_name: str,
-    folder_name: str,
+    submission_dir: str,
 ):
     """Writes the Pandas DataFrame to a CSV file on PACE."""
 
     # prepare and write the submission
     submission_df = prepare_and_write_submission(df)
-    project_dir = get_plantclef_dir()
-    submission_path = (
-        f"{project_dir}/submissions/aggregation_seasons/{testset_name}/{folder_name}"
-    )
-    output_path = f"{submission_path}/{file_name}"
+    output_path = f"{submission_dir}/{file_name}"
     # ensure directory exists before saving
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     # write to CSV
@@ -85,17 +78,14 @@ def write_csv_to_pace(
 
 
 def main(
+    input_path: Annotated[str, typer.Argument(help="Input path")],
     file_name: Annotated[str, typer.Argument(help="CSV file to use for aggregation")],
-    testset_name: Annotated[str, typer.Argument(help="Testset name")],
+    submission_dir: Annotated[str, typer.Argument(help="Submission directory")],
     folder_name: Annotated[str, typer.Option(help="CSV file to use for aggregation")],
 ):
     project_path = "~/p-dsgt_clef2025-0/shared/plantclef"
-    submission_path = f"{project_path}/submissions/aggregation_seasons/{testset_name}"
-    sub_df = get_pandas_dataframe(
-        submission_path,
-        folder_name,
-        file_name,
-    )
+    # submission_path = f"{project_path}/submissions/aggregation_seasons/{testset_name}"
+    sub_df = get_pandas_dataframe(input_path, file_name)
 
     # define the file name
     FILE_NAME = f"dsgt_run_{folder_name}.csv"
@@ -107,5 +97,5 @@ def main(
     # get the filtered data
     final_df = filter_species_by_country(france_df, sub_df)
 
-    sub_file_name = f"geo_agg_topk10_{FILE_NAME}"
-    write_csv_to_pace(final_df, sub_file_name, testset_name, folder_name)
+    sub_file_name = f"geo_{FILE_NAME}"
+    write_csv_to_pace(final_df, sub_file_name, submission_dir)
