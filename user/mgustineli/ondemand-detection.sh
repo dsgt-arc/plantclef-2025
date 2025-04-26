@@ -32,6 +32,7 @@ plantclef workflow workflow \
     $task \
     --cpu-count 4 \
     --batch-size 1 \
+    --num-partitions 20 \
     --sample-id 0 \
     --num-sample-ids 1 \
     --use-test-data \
