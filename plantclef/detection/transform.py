@@ -219,10 +219,7 @@ class WrappedGroundingDINO(
         # self._nvidia_smi()
 
         def predict(image_binary: np.ndarray) -> np.ndarray:
-            print("=== Predicting ===")
-            print(f"image_binary type: {type(image_binary)}")
             image = deserialize_image(image_binary)
-            # model_inputs = torch.stack(images).to(self.device)
             detections = self.detect(image)
             filtered_detections = self.non_max_suppression(detections)
             positive_detections = self.get_positive_detections(filtered_detections)

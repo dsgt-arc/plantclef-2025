@@ -16,6 +16,7 @@ from pyspark.sql.types import (
 )
 
 from plantclef.embedding.transform import WrappedFineTunedDINOv2
+from plantclef.detection.transform import WrappedGroundingDINO
 from plantclef.spark import spark_resource
 from plantclef.model_setup import setup_fine_tuned_model
 from plantclef.serde import deserialize_image, serialize_image
@@ -61,11 +62,12 @@ def make_image_tiles_udf(grid_size: int):
     return image_tiles_udf
 
 
-class ProcessEmbeddings(luigi.Task):
+class ProcessTransform(luigi.Task):
     """Task to process embeddings."""
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
+    task = luigi.Parameter()  # task name: embed, detect, or classify
     cpu_count = luigi.IntParameter(default=4)
     batch_size = luigi.IntParameter(default=32)
     num_partitions = luigi.OptionalIntParameter(default=20)
@@ -84,7 +86,7 @@ class ProcessEmbeddings(luigi.Task):
 
     @property
     def columns_to_use(self) -> str:
-        # Use only image_name for test set
+        # use only image_name for test set
         columns_to_use = "image_name" if self.use_test_data else self.cols
         return columns_to_use
 
@@ -98,19 +100,29 @@ class ProcessEmbeddings(luigi.Task):
     def output(self):
         # write a partitioned dataset to disk
         return luigi.LocalTarget(
-            f"{self.output_path}/data/sample_id={self.sample_id}/_SUCCESS"
+            f"{self.output_path}/sample_id={self.sample_id}/_SUCCESS"
         )
+
+    def get_task(self):
+        if self.task == "embed":
+            return WrappedFineTunedDINOv2(
+                input_col="tile" if self.use_grid else "data",
+                output_col="output",
+                model_path=self.model_path,
+                model_name=self.model_name,
+                batch_size=self.batch_size,
+            )
+        elif self.task == "detect":
+            return WrappedGroundingDINO(
+                input_col="tile" if self.use_grid else "data",
+                output_col="output",
+                batch_size=self.batch_size,
+            )
 
     def pipeline(self):
         model = Pipeline(
             stages=[
-                WrappedFineTunedDINOv2(
-                    input_col="tile" if self.use_grid else "data",
-                    output_col="output",
-                    model_path=self.model_path,
-                    model_name=self.model_name,
-                    batch_size=self.batch_size,
-                ),
+                self.get_task(),
                 SQLTransformer(statement=self.sql_statement),
             ]
         )
@@ -168,7 +180,7 @@ class ProcessEmbeddings(luigi.Task):
             (
                 transformed.repartition(self.num_partitions)
                 .write.mode("overwrite")
-                .parquet(f"{self.output_path}/data/sample_id={self.sample_id}")
+                .parquet(f"{self.output_path}/sample_id={self.sample_id}")
             )
 
 
@@ -177,6 +189,7 @@ class Workflow(luigi.WrapperTask):
 
     input_path = luigi.Parameter()
     output_path = luigi.Parameter()
+    task = luigi.Parameter()  # task name: embed, detect, or classify
     sample_id = luigi.OptionalParameter()
     num_sample_ids = luigi.IntParameter(default=20)
     cpu_count = luigi.IntParameter(default=6)
@@ -195,9 +208,10 @@ class Workflow(luigi.WrapperTask):
 
         tasks = []
         for sample_id in sample_ids:
-            task = ProcessEmbeddings(
+            task = ProcessTransform(
                 input_path=self.input_path,
                 output_path=self.output_path,
+                task=self.task,
                 cpu_count=self.cpu_count,
                 batch_size=self.batch_size,
                 num_partitions=self.num_partitions,
@@ -214,6 +228,9 @@ class Workflow(luigi.WrapperTask):
 def main(
     input_path: Annotated[str, typer.Argument(help="Input root directory")],
     output_path: Annotated[str, typer.Argument(help="Output root directory")],
+    task: Annotated[
+        str, typer.Argument(help="Task name: embed, detect, or classify")
+    ] = None,
     cpu_count: Annotated[int, typer.Option(help="Number of CPUs")] = 8,
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
@@ -235,6 +252,7 @@ def main(
             Workflow(
                 input_path=input_path,
                 output_path=output_path,
+                task=task,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
                 sample_id=sample_id,
