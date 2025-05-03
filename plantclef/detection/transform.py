@@ -170,18 +170,13 @@ class WrappedGroundingDINO(
 
         # dictionary of lists to store positive detections
         positive_detections = defaultdict(list)
-        for label in range(len(filtered_detections["text_labels"])):
-            for positive_class in self.positive_classes:
-                if positive_class in filtered_detections["text_labels"][label]:
-                    positive_detections["text_labels"].append(
-                        filtered_detections["text_labels"][label]
-                    )
-                    positive_detections["boxes"].append(
-                        filtered_detections["boxes"][label]
-                    )
-                    positive_detections["scores"].append(
-                        filtered_detections["scores"][label]
-                    )
+
+        for i in range(len(filtered_detections["text_labels"])):
+            label = filtered_detections["text_labels"][i]
+            if any(positive_class in label for positive_class in self.positive_classes):
+                positive_detections["text_labels"].append(label)
+                positive_detections["boxes"].append(filtered_detections["boxes"][i])
+                positive_detections["scores"].append(filtered_detections["scores"][i])
 
         positive_detections["text_labels"] = positive_detections["text_labels"]
         positive_detections["boxes"] = positive_detections["boxes"]
