@@ -21,9 +21,9 @@ export SPARK_LOCAL_DIR=$TMPDIR/spark-tmp
 scratch_data_dir=$(realpath ~/scratch/plantclef/data)
 project_data_dir=/storage/coda1/p-dsgt_clef2025/0/shared/plantclef/data
 dataset_name=test_2025
+# file_name=${dataset_name}_grid=${grid_size}x${grid_size}
 file_name=${dataset_name}_detection_v1
 task=detect
-# file_name=${dataset_name}_grid=${grid_size}x${grid_size}
 
 # run the Python script
 plantclef workflow workflow \

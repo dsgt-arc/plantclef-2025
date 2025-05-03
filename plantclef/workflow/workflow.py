@@ -208,7 +208,7 @@ class Workflow(luigi.WrapperTask):
 
         tasks = []
         for sample_id in sample_ids:
-            task = ProcessTransform(
+            luigi_task = ProcessTransform(
                 input_path=self.input_path,
                 output_path=self.output_path,
                 task=self.task,
@@ -221,7 +221,7 @@ class Workflow(luigi.WrapperTask):
                 use_grid=self.use_grid,
                 grid_size=self.grid_size,
             )
-            tasks.append(task)
+            tasks.append(luigi_task)
         yield tasks
 
 
