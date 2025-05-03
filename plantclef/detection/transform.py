@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image
 from plantclef.serde import deserialize_image, serialize_image
 
+from .classes import CLASSES_V1
 from .params import HasBatchSize, HasCheckpointPathGroundingDINO
 from pyspark.sql import DataFrame
 from pyspark.ml import Transformer
@@ -68,19 +69,7 @@ class WrappedGroundingDINO(
         )
         self.BOX_THRESHOLD = 0.15
         self.TEXT_THRESHOLD = 0.1
-        self.CLASSES = [
-            "all leaves",
-            "single flower",
-            "single fruit",
-            "sand",
-            "gravel",
-            "wood",
-            "tape",
-            "single plant",
-            "tree",
-            "rock",
-            "vegetation",
-        ]
+        self.CLASSES = CLASSES_V1
         self.positive_classes = [
             "leaves",
             "flower",
