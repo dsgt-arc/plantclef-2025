@@ -5,78 +5,12 @@ from plantclef.serde import deserialize_image
 from plantclef.config import get_class_mappings_file
 from plantclef.model_setup import setup_fine_tuned_model
 from pyspark.ml import Transformer
-from pyspark.ml.param import Param, Params, TypeConverters
 from pyspark.ml.param.shared import HasInputCol, HasOutputCol
 from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import ArrayType, FloatType, MapType, StringType
-
-
-class HasModelPath(Param):
-    """
-    Mixin for param model_path: str
-    """
-
-    modelPath = Param(
-        Params._dummy(),
-        "modelPath",
-        "The path to the fine-tuned DINOv2 model",
-        typeConverter=TypeConverters.toString,
-    )
-
-    def __init__(self):
-        super().__init__(
-            default=setup_fine_tuned_model(),
-            doc="The path to the fine-tuned DINOv2 model",
-        )
-
-    def getModelPath(self) -> str:
-        return self.getOrDefault(self.modelPath)
-
-
-class HasModelName(Param):
-    """
-    Mixin for param model_name: str
-    """
-
-    modelName = Param(
-        Params._dummy(),
-        "modelName",
-        "The name of the DINOv2 model to use",
-        typeConverter=TypeConverters.toString,
-    )
-
-    def __init__(self):
-        super().__init__(
-            default="vit_base_patch14_reg4_dinov2.lvd142m",
-            doc="The name of the DINOv2 model to use",
-        )
-
-    def getModelName(self) -> str:
-        return self.getOrDefault(self.modelName)
-
-
-class HasBatchSize(Param):
-    """
-    Mixin for param batch_size: int
-    """
-
-    batchSize = Param(
-        Params._dummy(),
-        "batchSize",
-        "The batch size to use for embedding extraction",
-        typeConverter=TypeConverters.toInt,
-    )
-
-    def __init__(self):
-        super().__init__(
-            default=32,
-            doc="The batch size to use for embedding extraction",
-        )
-
-    def getBatchSize(self) -> int:
-        return self.getOrDefault(self.batchSize)
+from pyspark.sql.types import ArrayType, FloatType
+from .params import HasModelPath, HasModelName, HasBatchSize
 
 
 class ClasifierFineTunedDINOv2(
@@ -152,20 +86,6 @@ class ClasifierFineTunedDINOv2(
         prior_row = prior_row.iloc[0]["prior_probabilities"]
         return prior_row
 
-    def _split_into_grid(self, image):
-        w, h = image.size
-        grid_w, grid_h = w // self.grid_size, h // self.grid_size
-        images = []
-        for i in range(self.grid_size):
-            for j in range(self.grid_size):
-                left = i * grid_w
-                upper = j * grid_h
-                right = left + grid_w
-                lower = upper + grid_h
-                crop_image = image.crop((left, upper, right, lower))
-                images.append(crop_image)
-        return images
-
     def _nvidia_smi(self):
         from subprocess import run, PIPE
 
@@ -181,53 +101,29 @@ class ClasifierFineTunedDINOv2(
     def _make_predict_fn(self):
         """Return UDF using a closure over the model"""
 
-        # check on the nvidia stats when generating the predict function
-        self._nvidia_smi()
+        # # check on the nvidia stats when generating the predict function
+        # self._nvidia_smi()
 
         def predict(input_data, image_name):
             img = deserialize_image(input_data)  # from bytes to PIL image
-            top_k_proba = 10
-            limit_logits = 10
-            images = [img]
-            # use grid to get logits
-            if self.use_grid:
-                images = self._split_into_grid(img)
-            results = []
-            for tile in images:
-                processed_image = self.transforms(tile).unsqueeze(0).to(self.device)
-                with torch.no_grad():
-                    outputs = self.model(processed_image)
-                    probabilities = torch.softmax(outputs, dim=1) * 100
 
-                    # use Prior probabilities
-                    if self.prior_path:
-                        prior = self._get_prior_for_image(image_name)
-                        probabilities = probabilities * torch.tensor(prior).to(
-                            self.device
-                        )
+            processed_image = self.transforms(img).unsqueeze(0).to(self.device)
+            with torch.no_grad():
+                logits = self.model(processed_image)
+                probabilities = torch.softmax(logits, dim=1)
 
-                    top_probs, top_indices = torch.topk(probabilities, k=top_k_proba)
-                top_probs = top_probs.cpu().numpy()[0]
-                top_indices = top_indices.cpu().numpy()[0]
+                # use Prior probabilities
+                if self.prior_path:
+                    prior = self._get_prior_for_image(image_name)
+                    probabilities = probabilities * torch.tensor(prior).to(self.device)
 
-                result = [
-                    {self.cid_to_spid[index]: float(prob)}
-                    for index, prob in zip(top_indices, top_probs)
-                ]
-                results.append(result)
-            # flatten the results from all grids, get top probabilities
-            flattened_results = [
-                item for grid in results for item in grid[:limit_logits]
-            ]
-            # sort by score in descending order
-            sorted_preds = sorted(flattened_results, key=lambda x: -list(x.values())[0])
-            return sorted_preds
+            return probabilities[0].cpu().numpy().tolist()
 
         return predict
 
     def _transform(self, df: DataFrame):
         predict_fn = self._make_predict_fn()
-        predict_udf = F.udf(predict_fn, ArrayType(MapType(StringType(), FloatType())))
+        predict_udf = F.udf(predict_fn, ArrayType(FloatType()))
         return df.withColumn(
             self.getOutputCol(),
             predict_udf(F.col(self.getInputCol()), F.col("image_name")),

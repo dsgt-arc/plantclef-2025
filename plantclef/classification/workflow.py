@@ -1,16 +1,64 @@
 import luigi
 import typer
+import pandas as pd
+from PIL import Image
 from typing_extensions import Annotated
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import SQLTransformer
-from pyspark.ml.functions import vector_to_array
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
+from pyspark.sql.types import (
+    ArrayType,
+    BinaryType,
+    IntegerType,
+    StructType,
+    StructField,
+)
 
 from plantclef.model_setup import setup_fine_tuned_model
 from plantclef.classification.transform import ClasifierFineTunedDINOv2
-from plantclef.classification.submission import SubmissionTask
 from plantclef.spark import spark_resource
+from plantclef.serde import deserialize_image, serialize_image
+
+
+def make_image_tiles_udf(grid_size: int):
+    def split_into_grid(image: Image.Image):
+        w, h = image.size
+        grid_w, grid_h = w // grid_size, h // grid_size
+        tiles = []
+        for i in range(grid_size):
+            for j in range(grid_size):
+                left = i * grid_w
+                upper = j * grid_h
+                right = left + grid_w
+                lower = upper + grid_h
+                tile = image.crop((left, upper, right, lower))
+                tiles.append(tile)
+        return tiles
+
+    @F.pandas_udf(
+        ArrayType(
+            StructType(
+                [
+                    StructField("tile_index", IntegerType()),
+                    StructField("tile", BinaryType()),
+                ]
+            )
+        )
+    )
+    def image_tiles_udf(data_series: pd.Series) -> pd.Series:
+        all_tiles = []
+        for b in data_series:
+            img = deserialize_image(b)
+            tiles = split_into_grid(img)
+            tile_structs = [
+                {"tile_index": i, "tile": serialize_image(tile)}
+                for i, tile in enumerate(tiles)
+            ]
+            all_tiles.append(tile_structs)
+        return pd.Series(all_tiles)
+
+    return image_tiles_udf
 
 
 class ProcessClassifier(luigi.Task):
@@ -27,10 +75,11 @@ class ProcessClassifier(luigi.Task):
     num_sample_ids = luigi.IntParameter(default=20)
     # controls the number of partitions written to disk, must be at least the number
     # of tasks that we have in parallel to best take advantage of disk
+    use_detections = luigi.BoolParameter(default=False)
     model_path = luigi.Parameter(default=setup_fine_tuned_model(scratch_model=True))
     model_name = luigi.Parameter(default="vit_base_patch14_reg4_dinov2.lvd142m")
-    use_grid = luigi.BoolParameter(default=True)
-    grid_size = luigi.IntParameter(default=3)
+    use_grid = luigi.BoolParameter(default=False)
+    grid_size = luigi.IntParameter(default=4)
     prior_path = luigi.Parameter(default=None)  # use Bayesian prior inference
     sql_statement = luigi.Parameter(default="SELECT image_name, logits FROM __THIS__")
 
@@ -47,7 +96,7 @@ class ProcessClassifier(luigi.Task):
         model = Pipeline(
             stages=[
                 ClasifierFineTunedDINOv2(
-                    input_col="data",
+                    input_col="extracted_bbox" if self.use_detections else "data",
                     output_col="logits",
                     model_path=self.model_path,
                     model_name=self.model_name,
@@ -62,17 +111,34 @@ class ProcessClassifier(luigi.Task):
         return model
 
     @property
-    def feature_columns(self) -> list:
-        return ["logits"]
+    def output_columns(self) -> list:
+        output_col = ["probabilities"]
+        if self.use_grid:
+            output_col.append("tile_index")
+        return output_col
 
-    def transform(self, model, df, features) -> DataFrame:
+    def transform(self, model, df) -> DataFrame:
+        if self.use_grid:
+            tile_udf = make_image_tiles_udf(self.grid_size)
+            df_with_tiles = df.withColumn("tiles", tile_udf("data"))
+            df_tiles = df_with_tiles.select(
+                "image_name", F.explode("tiles").alias("tile_struct")
+            )
+            df = df_tiles.select(
+                "image_name",
+                F.col("tile_struct.tile_index").alias("tile_index"),
+                F.col("tile_struct.tile").alias("tile"),
+            )
+        if self.use_detections:
+            df = df.select(
+                "image_name",
+                F.explode("output.extracted_bbox").alias("extracted_bbox"),
+            )
+        # transform the dataframe
         transformed = model.transform(df)
 
-        for c in features:
-            # check if the feature is a vector and convert it to an array
-            if "array" in transformed.schema[c].simpleString():
-                continue
-            transformed = transformed.withColumn(c, vector_to_array(F.col(c)))
+        # unpack the output column
+        transformed = transformed.select("image_name", *self.output_columns)
         return transformed
 
     def run(self):
@@ -96,7 +162,7 @@ class ProcessClassifier(luigi.Task):
             pipeline_model = self.pipeline().fit(df)
 
             # transform the dataframe and write to disk
-            transformed = self.transform(pipeline_model, df, self.feature_columns)
+            transformed = self.transform(pipeline_model, df)
 
             transformed.printSchema()
             transformed.explain()
@@ -117,6 +183,7 @@ class Workflow(luigi.Task):
     dataset_name = luigi.Parameter()
     sample_id = luigi.OptionalParameter()
     num_sample_ids = luigi.IntParameter(default=20)
+    use_detections = luigi.BoolParameter(default=False)
     cpu_count = luigi.IntParameter(default=6)
     batch_size = luigi.IntParameter(default=32)
     # set use_grid=False to perform inference on the entire image
@@ -166,6 +233,7 @@ class Workflow(luigi.Task):
                 batch_size=self.batch_size,
                 sample_id=sample_id,
                 num_sample_ids=self.num_sample_ids,
+                use_detections=self.use_detections,
                 use_grid=self.use_grid,
                 grid_size=self.grid_size,
                 num_partitions=self.num_partitions,
@@ -177,16 +245,16 @@ class Workflow(luigi.Task):
         for task in tasks:
             yield task
 
-        # run Submission task
-        yield SubmissionTask(
-            input_path=output_path,
-            output_path=self.submission_path,
-            dataset_name=self.dataset_name,
-            top_k=self.top_k_proba,
-            use_grid=self.use_grid,
-            grid_size=self.grid_size,
-            prior_path=self.prior_path,
-        )
+        # # run Submission task
+        # yield SubmissionTask(
+        #     input_path=output_path,
+        #     output_path=self.submission_path,
+        #     dataset_name=self.dataset_name,
+        #     top_k=self.top_k_proba,
+        #     use_grid=self.use_grid,
+        #     grid_size=self.grid_size,
+        #     prior_path=self.prior_path,
+        # )
 
 
 def main(
@@ -198,8 +266,9 @@ def main(
     batch_size: Annotated[int, typer.Option(help="Batch size")] = 32,
     sample_id: Annotated[int, typer.Option(help="Sample ID")] = None,
     num_sample_ids: Annotated[int, typer.Option(help="Number of sample IDs")] = 20,
+    use_detections: Annotated[bool, typer.Option(help="Use detections")] = False,
     use_grid: Annotated[bool, typer.Option(help="Use grid")] = False,
-    grid_size: Annotated[int, typer.Option(help="Grid size")] = 3,
+    grid_size: Annotated[int, typer.Option(help="Grid size")] = 4,
     top_k_proba: Annotated[int, typer.Option(help="Top K probability")] = 5,
     num_partitions: Annotated[int, typer.Option(help="Number of partitions")] = 10,
     prior_path: Annotated[str, typer.Option(help="Prior dataframe path")] = None,
@@ -221,8 +290,9 @@ def main(
                 dataset_name=dataset_name,
                 cpu_count=cpu_count,
                 batch_size=batch_size,
-                num_sample_ids=num_sample_ids,
                 sample_id=sample_id,
+                num_sample_ids=num_sample_ids,
+                use_detections=use_detections,
                 use_grid=use_grid,
                 grid_size=grid_size,
                 top_k_proba=top_k_proba,
