@@ -30,6 +30,7 @@ dependencies = [
     "geopandas",
     "pacmap",
     "umap-learn",
+    "ipykernel>=6.29.5",
 ]
 
 [project.optional-dependencies]

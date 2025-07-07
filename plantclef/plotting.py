@@ -42,6 +42,8 @@ def plot_images_from_binary(
     grid_size=(3, 3),
     crop_square: bool = False,
     figsize: tuple = (12, 12),
+    fontsize: int = 16,
+    text_width: int = 25,
     dpi: int = 80,
 ):
     """
@@ -79,8 +81,8 @@ def plot_images_from_binary(
 
         ax.imshow(image)
         name = name.replace("_", " ")
-        wrapped_name = "\n".join(textwrap.wrap(name, width=25))
-        ax.set_title(wrapped_name, fontsize=16, pad=1)
+        wrapped_name = "\n".join(textwrap.wrap(name, width=text_width))
+        ax.set_title(wrapped_name, fontsize=fontsize, pad=1)
         ax.set_xticks([])
         ax.set_yticks([])
         spines = ["top", "right", "bottom", "left"]
